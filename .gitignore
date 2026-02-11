@@ -1,0 +1,6 @@
+.env
+lib/
+images/
+rag_cache/
+AGENTS.md
+__pycache__/
