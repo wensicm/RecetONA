@@ -60,6 +60,45 @@ Para ver opciones disponibles:
 3. La primera celda instala automáticamente `requirements.txt` en `lib`.
 4. Lanza tus preguntas sobre productos/recetas y costes.
 
+## Empaquetado como MCP (`@RecetONA`)
+
+Este repo incluye `recetona_mcp_server.py`, un servidor MCP local (Python 3.12) con tools:
+
+- `query_recipe(pregunta)`: usa el motor RAG del notebook y devuelve el texto final listo para el usuario.
+- `search(query, limit)`: busca productos en el catálogo.
+- `fetch(id)`: recupera detalle completo de un producto.
+
+### 1) Instalar dependencias en `lib`
+
+```bash
+/usr/bin/python3.12 -m pip install --upgrade --target ./lib -r requirements.txt
+```
+
+### 2) Registrar MCP en Codex (`config.toml`)
+
+En `~/.codex/config.toml` (o `.codex/config.toml` del proyecto):
+
+```toml
+[mcp_servers.RecetONA]
+command = "/usr/bin/python3.12"
+args = ["/home/wencm/RecetONA/recetona_mcp_server.py", "--transport", "stdio"]
+cwd = "/home/wencm/RecetONA"
+startup_timeout_sec = 45
+tool_timeout_sec = 240
+enabled = true
+```
+
+### 3) Usarlo en chat
+
+- En clientes que soportan menciones, invócalo como `@RecetONA`.
+- Si el cliente no soporta menciones, pide explícitamente usar la tool `query_recipe`.
+
+Ejemplo:
+
+```text
+@RecetONA dame una receta de lentejas para 4 personas y el precio de compra
+```
+
 ## Notas
 
 - Este repositorio usa rutas locales y caché (`rag_cache/`) para acelerar consultas.
@@ -69,4 +108,3 @@ Para ver opciones disponibles:
 
 La propiedad intelectual de este repositorio (código, notebooks, documentación y estructura del proyecto) pertenece al creador del repositorio.  
 Todos los derechos reservados.
-

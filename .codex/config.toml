@@ -1,0 +1,7 @@
+[mcp_servers.RecetONA]
+command = "/usr/bin/python3.12"
+args = ["/home/wencm/RecetONA/recetona_mcp_server.py", "--transport", "stdio"]
+cwd = "/home/wencm/RecetONA"
+startup_timeout_sec = 45
+tool_timeout_sec = 240
+enabled = true

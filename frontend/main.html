@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RecetONA Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --app-bg: #0d1317;
+        --chat-wallpaper: radial-gradient(circle at 20% 20%, #1f2d34 0, #111b21 42%, #0a1014 100%);
+        --panel: #202c33;
+        --panel-2: #111b21;
+        --line: #2f3b43;
+        --text: #e9edef;
+        --muted: #93a2ad;
+        --incoming: #202c33;
+        --outgoing: #005c4b;
+        --accent: #00a884;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Manrope", "Segoe UI", sans-serif;
+        background: linear-gradient(180deg, #0e1519 0%, #071015 100%);
+        color: var(--text);
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+
+      .phone {
+        width: min(420px, 100%);
+        height: min(860px, 94vh);
+        border-radius: 26px;
+        overflow: hidden;
+        border: 1px solid #31424d;
+        box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
+        background: var(--panel-2);
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+      }
+
+      .topbar {
+        background: var(--panel);
+        border-bottom: 1px solid var(--line);
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(140deg, #00c98a, #00856a);
+        display: grid;
+        place-items: center;
+        color: #06231c;
+        font-weight: 700;
+      }
+
+      .title {
+        line-height: 1.2;
+      }
+
+      .title strong {
+        display: block;
+        font-size: 0.95rem;
+      }
+
+      .title span {
+        font-size: 0.77rem;
+        color: var(--muted);
+      }
+
+      .chat {
+        background: var(--chat-wallpaper);
+        padding: 18px 12px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .msg {
+        max-width: 82%;
+        padding: 10px 12px;
+        border-radius: 12px;
+        line-height: 1.35;
+        font-size: 0.92rem;
+        white-space: pre-wrap;
+        animation: fadeIn 180ms ease-out;
+      }
+
+      .msg.bot {
+        align-self: flex-start;
+        background: var(--incoming);
+        border-top-left-radius: 4px;
+      }
+
+      .msg.user {
+        align-self: flex-end;
+        background: var(--outgoing);
+        border-top-right-radius: 4px;
+      }
+
+      .time {
+        display: block;
+        font-size: 0.68rem;
+        color: #b5c6cf;
+        opacity: 0.8;
+        margin-top: 5px;
+        text-align: right;
+      }
+
+      .composer {
+        background: var(--panel);
+        border-top: 1px solid var(--line);
+        padding: 10px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+      }
+
+      .composer textarea {
+        resize: none;
+        border: 1px solid #2d3a42;
+        outline: none;
+        border-radius: 12px;
+        background: #2a3942;
+        color: var(--text);
+        font: inherit;
+        padding: 10px 12px;
+        min-height: 44px;
+        max-height: 130px;
+      }
+
+      .composer textarea::placeholder {
+        color: #9ab0bf;
+      }
+
+      .composer button {
+        border: 0;
+        border-radius: 12px;
+        background: var(--accent);
+        color: #002920;
+        font: inherit;
+        font-weight: 700;
+        padding: 0 16px;
+        cursor: pointer;
+        transition: transform 0.15s ease, filter 0.15s ease;
+      }
+
+      .composer button:hover {
+        filter: brightness(1.05);
+      }
+
+      .composer button:active {
+        transform: translateY(1px);
+      }
+
+      .typing {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .typing span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #bfd1da;
+        animation: bounce 900ms infinite;
+      }
+
+      .typing span:nth-child(2) {
+        animation-delay: 100ms;
+      }
+
+      .typing span:nth-child(3) {
+        animation-delay: 200ms;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes bounce {
+        0%,
+        80%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.55;
+        }
+        40% {
+          transform: translateY(-4px);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 640px) {
+        body {
+          padding: 0;
+        }
+
+        .phone {
+          width: 100%;
+          height: 100vh;
+          border-radius: 0;
+          border: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="phone" aria-label="Chat estilo WhatsApp">
+      <header class="topbar">
+        <div class="avatar">R</div>
+        <div class="title">
+          <strong>RecetONA Bot</strong>
+          <span>Jupyter RAG · backend local</span>
+        </div>
+      </header>
+
+      <section id="chat" class="chat" aria-live="polite"></section>
+
+      <form id="composer" class="composer">
+        <textarea
+          id="input"
+          placeholder="Escribe al bot (ej: receta de lentejas para 4 personas)"
+          rows="1"
+          required
+        ></textarea>
+        <button type="submit">Enviar</button>
+      </form>
+    </main>
+
+    <script>
+      const chat = document.getElementById("chat");
+      const form = document.getElementById("composer");
+      const input = document.getElementById("input");
+
+      const now = () => {
+        const d = new Date();
+        return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      };
+
+      function addMessage(text, role) {
+        const bubble = document.createElement("article");
+        bubble.className = `msg ${role}`;
+        bubble.textContent = text;
+
+        const time = document.createElement("small");
+        time.className = "time";
+        time.textContent = now();
+
+        bubble.appendChild(time);
+        chat.appendChild(bubble);
+        chat.scrollTop = chat.scrollHeight;
+      }
+
+      function addTyping() {
+        const bubble = document.createElement("article");
+        bubble.className = "msg bot";
+        bubble.id = "typing";
+        bubble.innerHTML = `<span class="typing"><span></span><span></span><span></span></span>`;
+        chat.appendChild(bubble);
+        chat.scrollTop = chat.scrollHeight;
+      }
+
+      function removeTyping() {
+        document.getElementById("typing")?.remove();
+      }
+
+      const RAG_API_URL = "http://127.0.0.1:8787/chat";
+      const RAG_HEALTH_URL = "http://127.0.0.1:8787/health";
+
+      async function askJupyterRag(message) {
+        const response = await fetch(RAG_API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const error = payload.error || `Error HTTP ${response.status}`;
+          throw new Error(error);
+        }
+
+        if (!payload.answer || typeof payload.answer !== "string") {
+          throw new Error("La API local no devolvio 'answer'.");
+        }
+        return payload.answer;
+      }
+
+      input.addEventListener("input", () => {
+        input.style.height = "auto";
+        input.style.height = Math.min(input.scrollHeight, 130) + "px";
+      });
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+
+        addMessage(text, "user");
+        input.value = "";
+        input.style.height = "44px";
+
+        addTyping();
+        try {
+          const reply = await askJupyterRag(text);
+          addMessage(reply, "bot");
+        } catch (err) {
+          addMessage(
+            `No pude conectar con el backend local del notebook.\nInicia: python3.12 /home/wencm/RecetONA/local_rag_server.py\nDetalle: ${err.message}`,
+            "bot"
+          );
+        } finally {
+          removeTyping();
+        }
+      });
+
+      (async () => {
+        try {
+          const health = await fetch(RAG_HEALTH_URL);
+          if (health.ok) {
+            addMessage("Backend local conectado. Puedes preguntarme recetas.", "bot");
+            return;
+          }
+        } catch (_) {}
+        addMessage(
+          "No encuentro el backend local. Arráncalo con: python3.12 /home/wencm/RecetONA/local_rag_server.py",
+          "bot"
+        );
+      })();
+    </script>
+  </body>
+</html>
