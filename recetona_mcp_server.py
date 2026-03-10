@@ -13,9 +13,6 @@ from typing import Any
 BASE_DIR = Path(__file__).resolve().parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
-LIB_DIR = BASE_DIR / "lib"
-if str(LIB_DIR) not in sys.path:
-    sys.path.insert(0, str(LIB_DIR))
 
 import numpy as np
 import pandas as pd

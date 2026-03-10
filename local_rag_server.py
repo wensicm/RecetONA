@@ -10,12 +10,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-LIB_DIR = BASE_DIR / "lib"
 NOTEBOOK_PATH = BASE_DIR / "mercadona_rag_notebook.ipynb"
 ENV_PATH = BASE_DIR / ".env"
-
-if str(LIB_DIR) not in sys.path:
-    sys.path.insert(0, str(LIB_DIR))
 
 
 def load_env_file(path: Path) -> None:

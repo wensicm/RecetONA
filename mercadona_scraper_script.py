@@ -40,14 +40,9 @@ import os
 import re
 import unicodedata
 from urllib.parse import parse_qs, urlparse
-import sys
 import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional
-
-LIB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib")
-if os.path.isdir(LIB_DIR) and LIB_DIR not in sys.path:
-    sys.path.insert(0, LIB_DIR)
 
 import pandas as pd
 import requests

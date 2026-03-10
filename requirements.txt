@@ -3,3 +3,5 @@ pandas
 openpyxl
 openai
 mcp
+requests
+rapidocr_onnxruntime

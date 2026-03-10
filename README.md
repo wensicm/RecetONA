@@ -1,86 +1,98 @@
 # RecetONA
 
 Proyecto para extraer, enriquecer y consultar datos de productos de Mercadona usando:
-- `mercadona_scraper_script.py` para scraping/actualización de datos.
-- `mercadona_rag_notebook.ipynb` para consultas tipo RAG con OpenAI sobre `mercadona_data.xlsx`.
-
-## Estructura
-
-- `mercadona_scraper_script.py`: script principal de scraping y procesamiento.
-- `mercadona_data.xlsx`: dataset de productos.
-- `mercadona_rag_notebook.ipynb`: notebook para consultas y generación de recetas/coste.
-- `requirements.txt`: dependencias Python.
-- `lib/`: instalación local de dependencias (target de `pip`).
-- `images/`: imágenes descargadas de productos.
-- `rag_cache/`: caché de embeddings/chunks para RAG.
+- `mercadona_scraper_script.py` para scraping y actualización del dataset.
+- `local_rag_server.py` para exponer el motor RAG local por HTTP.
+- `recetona_mcp_server.py` para exponerlo como servidor MCP.
 
 ## Requisitos
 
 - Python 3.12
-- API key de OpenAI
+- Un entorno virtual local `.venv`
+- `OPENAI_API_KEY` en `.env` para las consultas RAG
 
 ## Configuración
 
-1. Crear archivo de entorno:
+1. Crea el entorno virtual:
+
+```bash
+python3.12 -m venv .venv
+```
+
+2. Actívalo:
+
+```bash
+source .venv/bin/activate
+```
+
+3. Instala dependencias:
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+4. Crea tu archivo de entorno:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Añadir tu clave:
+5. Añade tu clave:
 
 ```env
 OPENAI_API_KEY=tu_clave_aqui
 ```
 
-3. Instalar dependencias en `lib`:
+## Ejecución desde terminal
+
+### Scraper
 
 ```bash
-/usr/bin/python3 -m pip install --upgrade --target ./lib -r requirements.txt
+source .venv/bin/activate
+python mercadona_scraper_script.py
 ```
 
-## Uso del scraper
-
-Ejecuta el script principal:
+Ver opciones:
 
 ```bash
-/usr/bin/python3 mercadona_scraper_script.py
+python mercadona_scraper_script.py -h
 ```
 
-Para ver opciones disponibles:
+### API local HTTP
 
 ```bash
-/usr/bin/python3 mercadona_scraper_script.py -h
+source .venv/bin/activate
+python local_rag_server.py
 ```
 
-## Uso del notebook RAG
+Endpoints:
+- `GET /health`
+- `POST /chat`
 
-1. Abrir `mercadona_rag_notebook.ipynb`.
-2. Ejecutar las celdas en orden.
-3. La primera celda instala automáticamente `requirements.txt` en `lib`.
-4. Lanza tus preguntas sobre productos/recetas y costes.
+### Frontend demo
 
-## Empaquetado como MCP (`@RecetONA`)
-
-Este repo incluye `recetona_mcp_server.py`, un servidor MCP local (Python 3.12) con tools:
-
-- `query_recipe(pregunta)`: usa el motor RAG del notebook y devuelve el texto final listo para el usuario.
-- `search(query, limit)`: busca productos en el catálogo.
-- `fetch(id)`: recupera detalle completo de un producto.
-
-### 1) Instalar dependencias en `lib`
+Con la API local arrancada en otra terminal:
 
 ```bash
-/usr/bin/python3.12 -m pip install --upgrade --target ./lib -r requirements.txt
+cd frontend
+python -m http.server 8080
 ```
 
-### 2) Registrar MCP en Codex (`config.toml`)
+Luego abre `http://127.0.0.1:8080/main.html`.
 
-En `~/.codex/config.toml` (o `.codex/config.toml` del proyecto):
+### MCP
+
+```bash
+source .venv/bin/activate
+python recetona_mcp_server.py --transport stdio
+```
+
+Registro en Codex:
 
 ```toml
 [mcp_servers.RecetONA]
-command = "/usr/bin/python3.12"
+command = "/home/wencm/RecetONA/.venv/bin/python"
 args = ["/home/wencm/RecetONA/recetona_mcp_server.py", "--transport", "stdio"]
 cwd = "/home/wencm/RecetONA"
 startup_timeout_sec = 45
@@ -88,23 +100,11 @@ tool_timeout_sec = 240
 enabled = true
 ```
 
-### 3) Usarlo en chat
+## Notebook
 
-- En clientes que soportan menciones, invócalo como `@RecetONA`.
-- Si el cliente no soporta menciones, pide explícitamente usar la tool `query_recipe`.
-
-Ejemplo:
-
-```text
-@RecetONA dame una receta de lentejas para 4 personas y el precio de compra
-```
+El notebook sigue existiendo para exploración, pero la recomendación operativa es ejecutar el proyecto desde `.venv`. Si lo usas, ábrelo con el kernel del `.venv`.
 
 ## Notas
 
-- Este repositorio usa rutas locales y caché (`rag_cache/`) para acelerar consultas.
-- `lib/`, `images/`, `rag_cache/`, `.env` y `AGENTS.md` están excluidos por `.gitignore`.
-
-## Propiedad intelectual
-
-La propiedad intelectual de este repositorio (código, notebooks, documentación y estructura del proyecto) pertenece al creador del repositorio.  
-Todos los derechos reservados.
+- `images/`, `rag_cache/`, `.venv/`, `.env` y `AGENTS.md` están excluidos por `.gitignore`.
+- Ya no hace falta instalar dependencias en `lib/`.
