@@ -16,3 +16,4 @@ config*secret*
 *token*
 kaggle.json
 openai_api_key.json
+.codex/environments/environment.toml
