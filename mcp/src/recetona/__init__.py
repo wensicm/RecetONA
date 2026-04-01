@@ -2,13 +2,19 @@
 
 from .config import Settings, get_settings
 from .models import FetchPayload, RecipeAnswer, SearchResult
-from .services.runtime import RecetonaService
+
+try:
+    from .services.runtime import RecetonaService
+except ModuleNotFoundError:  # pragma: no cover - compatibilidad defensiva
+    RecetonaService = None
 
 __all__ = [
     "FetchPayload",
     "RecipeAnswer",
-    "RecetonaService",
     "SearchResult",
     "Settings",
     "get_settings",
 ]
+
+if RecetonaService is not None:
+    __all__.append("RecetonaService")

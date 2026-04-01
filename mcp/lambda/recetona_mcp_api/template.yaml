@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  API Gateway + Lambda para exponer RecetONA como servidor MCP remoto.
+
+Parameters:
+  FailureTopicArn:
+    Type: String
+    Default: ""
+    Description: >
+      ARN del topic SNS para OnFailure. En HTTP sincrono no se usa en la
+      peticion normal, pero queda preparado para invocaciones asincronas.
+  CustomDomainName:
+    Type: String
+    Default: api.wensicm.com
+    Description: Dominio publico para exponer el MCP remoto.
+  CustomDomainBasePath:
+    Type: String
+    Default: recetona/mcp
+    Description: Base path del API mapping bajo el custom domain.
+  HostedZoneId:
+    Type: String
+    Default: Z02403658XTRJXRUCRDY
+    Description: Hosted zone publica en Route 53 para wensicm.com.
+  OpenAiApiKeyParameterName:
+    Type: String
+    Default: OPENAI_API_KEY
+    Description: Nombre del SecureString en SSM con la API key de OpenAI.
+
+Conditions:
+  HasFailureTopicArn: !Not [!Equals [!Ref FailureTopicArn, ""]]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures:
+      - arm64
+    MemorySize: 2048
+    Timeout: 29
+    Tracing: Active
+    Environment:
+      Variables:
+        PYTHONPATH: /var/task:/var/task/src
+        RECETONA_REQUIRE_PREBUILT_RAG_CACHE: "true"
+        RECETONA_EMBED_MODEL: text-embedding-3-large
+        RECETONA_CHAT_MODEL: gpt-5.4-nano
+        RECETONA_RAG_CACHE_DIR: /tmp/recetona_rag_cache
+        RECETONA_RAG_CACHE_S3_BUCKET: !Ref RecetonaRagCacheBucket
+        RECETONA_RAG_CACHE_S3_PREFIX: recetona/rag_cache
+        OPENAI_API_KEY_SSM_PARAMETER: !Ref OpenAiApiKeyParameterName
+
+Resources:
+  RecetonaMcpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - authorization
+          - content-type
+          - mcp-session-id
+        AllowMethods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        ExposeHeaders:
+          - mcp-session-id
+
+  RecetonaMcpCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref CustomDomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref CustomDomainName
+          HostedZoneId: !Ref HostedZoneId
+
+  RecetonaMcpCustomDomain:
+    Type: AWS::ApiGatewayV2::DomainName
+    Properties:
+      DomainName: !Ref CustomDomainName
+      DomainNameConfigurations:
+        - CertificateArn: !Ref RecetonaMcpCertificate
+          EndpointType: REGIONAL
+          SecurityPolicy: TLS_1_2
+
+  RecetonaRagCacheBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  RecetonaMcpFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Handler: app.lambda_handler
+      CodeUri: .
+      Policies:
+        - Statement:
+            - Sid: ReadOpenAiApiKeyFromSsm
+              Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${OpenAiApiKeyParameterName}"
+            - Sid: ReadRagCacheFromS3
+              Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub "arn:aws:s3:::${RecetonaRagCacheBucket}/recetona/rag_cache/*"
+      Events:
+        Default:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref RecetonaMcpApi
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref RecetonaMcpApi
+            Path: /
+            Method: ANY
+  RecetonaMcpEventInvokeConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    Condition: HasFailureTopicArn
+    Properties:
+      FunctionName: !Ref RecetonaMcpFunction
+      Qualifier: "$LATEST"
+      DestinationConfig:
+        OnFailure:
+          Destination: !Ref FailureTopicArn
+
+  RecetonaMcpApiMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Properties:
+      ApiId: !Ref RecetonaMcpApi
+      DomainName: !Ref RecetonaMcpCustomDomain
+      Stage: $default
+      ApiMappingKey: !Ref CustomDomainBasePath
+
+  RecetonaMcpCustomDomainRecordA:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref CustomDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt RecetonaMcpCustomDomain.RegionalDomainName
+        HostedZoneId: !GetAtt RecetonaMcpCustomDomain.RegionalHostedZoneId
+        EvaluateTargetHealth: false
+
+  RecetonaMcpCustomDomainRecordAAAA:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref CustomDomainName
+      Type: AAAA
+      AliasTarget:
+        DNSName: !GetAtt RecetonaMcpCustomDomain.RegionalDomainName
+        HostedZoneId: !GetAtt RecetonaMcpCustomDomain.RegionalHostedZoneId
+        EvaluateTargetHealth: false
+
+Outputs:
+  HttpApiBaseUrl:
+    Description: URL base del API Gateway HTTP.
+    Value: !Sub "https://${RecetonaMcpApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  McpUrl:
+    Description: Endpoint MCP remoto para ChatGPT Apps.
+    Value: !Sub "https://${RecetonaMcpApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  CustomDomainBaseUrl:
+    Description: URL base del custom domain.
+    Value: !Sub "https://${CustomDomainName}/${CustomDomainBasePath}"
+
+  CustomDomainMcpUrl:
+    Description: Endpoint MCP remoto bajo custom domain.
+    Value: !Sub "https://${CustomDomainName}/${CustomDomainBasePath}"
+
+  RagCacheBucketName:
+    Description: Bucket S3 donde vive la cache RAG de RecetONA.
+    Value: !Ref RecetonaRagCacheBucket

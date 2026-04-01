@@ -6,5 +6,12 @@ name = "RecetONA"
 script = '''
 cd /home/wencm/RecetONA
 source .venv/bin/activate
+'''
 
+[[actions]]
+name = "Servidor local"
+icon = "run"
+command = '''
+cd /Users/wensicm/Repositorios/RecetONA/frontend
+python3 -m http.server 8080
 '''

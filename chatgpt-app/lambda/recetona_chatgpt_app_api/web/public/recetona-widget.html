@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RecetONA</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f1e7;
+        --surface: #fffaf2;
+        --surface-strong: #fffdf8;
+        --ink: #2f2419;
+        --muted: #6f5a46;
+        --line: rgba(108, 74, 43, 0.16);
+        --accent: #9b4d12;
+        --accent-soft: rgba(155, 77, 18, 0.1);
+        --shadow: 0 18px 48px rgba(79, 48, 24, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            circle at top right,
+            rgba(225, 157, 76, 0.2),
+            transparent 34%
+          ),
+          linear-gradient(180deg, #fff8ef 0%, var(--bg) 100%);
+        color: var(--ink);
+        font:
+          15px/1.5 "Iowan Old Style", "Palatino Linotype", "Book Antiqua",
+          Georgia, serif;
+      }
+
+      .shell {
+        padding: 18px;
+      }
+
+      .panel {
+        background: linear-gradient(
+          180deg,
+          var(--surface) 0%,
+          var(--surface-strong) 100%
+        );
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .hero {
+        padding: 20px 20px 16px;
+        border-bottom: 1px solid var(--line);
+        background:
+          radial-gradient(
+            circle at top left,
+            rgba(155, 77, 18, 0.12),
+            transparent 28%
+          ),
+          linear-gradient(
+            135deg,
+            rgba(255, 255, 255, 0.95),
+            rgba(249, 241, 228, 0.98)
+          );
+      }
+
+      .eyebrow {
+        margin: 0 0 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        line-height: 1.1;
+      }
+
+      .stats {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        padding: 14px 20px 0;
+      }
+
+      .stat {
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: var(--accent-soft);
+        border: 1px solid rgba(155, 77, 18, 0.08);
+      }
+
+      .stat-label {
+        margin: 0;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .stat-value {
+        margin: 4px 0 0;
+        font-size: 22px;
+        line-height: 1.1;
+      }
+
+      .content {
+        display: grid;
+        gap: 18px;
+        padding: 18px;
+      }
+
+      .section {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.58);
+      }
+
+      .section h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+        line-height: 1.2;
+      }
+
+      .ingredient-list,
+      .step-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .ingredient-card {
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(255, 252, 247, 0.92);
+      }
+
+      .ingredient-name {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.2;
+      }
+
+      .ingredient-meta {
+        margin: 8px 0 0;
+        color: var(--muted);
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 34px 1fr;
+        gap: 12px;
+        align-items: start;
+      }
+
+      .step-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        background: var(--ink);
+        color: #fff;
+        font-weight: 700;
+      }
+
+      .step-text {
+        margin: 0;
+        padding-top: 4px;
+      }
+
+      .empty {
+        margin: 0;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <article class="panel">
+        <header class="hero">
+          <p class="eyebrow">RecetONA</p>
+          <h1 id="question">Preparando receta...</h1>
+          <div class="stats">
+            <div class="stat">
+              <p class="stat-label">Productos exactos</p>
+              <p class="stat-value" id="product-count">-</p>
+            </div>
+            <div class="stat">
+              <p class="stat-label">Personas</p>
+              <p class="stat-value" id="servings">-</p>
+            </div>
+            <div class="stat">
+              <p class="stat-label">Compra total</p>
+              <p class="stat-value" id="purchase-cost">-</p>
+            </div>
+            <div class="stat">
+              <p class="stat-label">Coste consumido</p>
+              <p class="stat-value" id="consumed-cost">-</p>
+            </div>
+          </div>
+        </header>
+
+        <div class="content">
+          <section class="section">
+            <h2>Lista de la compra</h2>
+            <div id="ingredients" class="ingredient-list"></div>
+          </section>
+
+          <section class="section">
+            <h2>Pasos</h2>
+            <div id="steps" class="step-list"></div>
+          </section>
+        </div>
+      </article>
+    </div>
+
+    <script>
+      const questionEl = document.getElementById("question");
+      const productCountEl = document.getElementById("product-count");
+      const servingsEl = document.getElementById("servings");
+      const purchaseCostEl = document.getElementById("purchase-cost");
+      const consumedCostEl = document.getElementById("consumed-cost");
+      const ingredientsEl = document.getElementById("ingredients");
+      const stepsEl = document.getElementById("steps");
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function formatMoney(value) {
+        if (
+          value === null ||
+          value === undefined ||
+          Number.isNaN(Number(value))
+        ) {
+          return "N/D";
+        }
+        return new Intl.NumberFormat(
+          document.documentElement.lang || "es-ES",
+          {
+            style: "currency",
+            currency: "EUR",
+          }
+        ).format(Number(value));
+      }
+
+      function buildIngredientMeta(item) {
+        const parts = [];
+        if (
+          item.cantidad_receta_valor !== null &&
+          item.cantidad_receta_valor !== undefined
+        ) {
+          const amount = Number(item.cantidad_receta_valor);
+          const amountText = Number.isInteger(amount)
+            ? String(amount)
+            : amount.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+          if (item.cantidad_receta_unidad) {
+            parts.push(amountText + " " + item.cantidad_receta_unidad);
+          } else {
+            parts.push(amountText);
+          }
+        }
+        if (
+          item.precio_envase_eur !== null &&
+          item.precio_envase_eur !== undefined
+        ) {
+          parts.push("envase " + formatMoney(item.precio_envase_eur));
+        }
+        if (
+          item.coste_compra_eur !== null &&
+          item.coste_compra_eur !== undefined
+        ) {
+          parts.push("compra " + formatMoney(item.coste_compra_eur));
+        }
+        return parts.join(" · ");
+      }
+
+      function splitSteps(text) {
+        const cleanText = String(text ?? "").trim();
+        if (!cleanText) {
+          return [];
+        }
+        return cleanText
+          .split(/(?<=[.!?])\s+/)
+          .map((part) => part.trim())
+          .filter(Boolean);
+      }
+
+      function getToolData() {
+        return window.openai?.toolOutput || {};
+      }
+
+      function formatQuestionTitle(value) {
+        const text = String(value ?? "").trim();
+        if (!text) {
+          return "Receta disponible";
+        }
+        return text.charAt(0).toUpperCase() + text.slice(1);
+      }
+
+      function renderIngredients(items) {
+        if (!Array.isArray(items) || items.length === 0) {
+          ingredientsEl.innerHTML =
+            '<p class="empty">No hay ingredientes estructurados.</p>';
+          return;
+        }
+
+        ingredientsEl.innerHTML = items
+          .map((item) => {
+            return `
+              <article class="ingredient-card">
+                <p class="ingredient-name">${escapeHtml(item.producto_mercadona || "Producto sin nombre")}</p>
+                <p class="ingredient-meta">${escapeHtml(buildIngredientMeta(item) || "Sin detalle de coste")}</p>
+              </article>
+            `;
+          })
+          .join("");
+      }
+
+      function renderSteps(text) {
+        const steps = splitSteps(text);
+        if (steps.length === 0) {
+          stepsEl.innerHTML =
+            '<p class="empty">No hay pasos disponibles.</p>';
+          return;
+        }
+
+        stepsEl.innerHTML = steps
+          .map((step, index) => {
+            return `
+              <div class="step">
+                <span class="step-index">${index + 1}</span>
+                <p class="step-text">${escapeHtml(step)}</p>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      function render(data) {
+        const payload = data && typeof data === "object" ? data : {};
+        const ingredients = Array.isArray(payload.ingredientes_mercadona)
+          ? payload.ingredientes_mercadona
+          : [];
+
+        questionEl.textContent = formatQuestionTitle(payload.pregunta);
+        productCountEl.textContent = String(
+          Array.isArray(payload.productos_mercadona_exactos)
+            ? payload.productos_mercadona_exactos.length
+            : ingredients.length
+        );
+        servingsEl.textContent = payload.personas || "-";
+        purchaseCostEl.textContent = formatMoney(
+          payload.coste_total_compra_eur
+        );
+        consumedCostEl.textContent = formatMoney(
+          payload.coste_total_consumido_eur
+        );
+
+        renderIngredients(ingredients);
+        renderSteps(payload.receta_y_pasos_texto_literal);
+      }
+
+      function handleToolResult(result) {
+        if (result && typeof result === "object") {
+          render(result.structuredContent || result);
+          return;
+        }
+        render(getToolData());
+      }
+
+      window.addEventListener(
+        "message",
+        (event) => {
+          if (event.source !== window.parent) {
+            return;
+          }
+          const message = event.data;
+          if (!message || message.jsonrpc !== "2.0") {
+            return;
+          }
+          if (message.method !== "ui/notifications/tool-result") {
+            return;
+          }
+          handleToolResult(message.params);
+        },
+        { passive: true }
+      );
+
+      window.addEventListener(
+        "openai:set_globals",
+        (event) => {
+          handleToolResult(
+            event.detail?.globals?.toolOutput || getToolData()
+          );
+        },
+        { passive: true }
+      );
+
+      render(getToolData());
+    </script>
+  </body>
+</html>

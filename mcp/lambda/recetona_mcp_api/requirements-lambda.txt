@@ -1,0 +1,6 @@
+mangum
+mcp
+numpy
+openai
+openpyxl
+pandas

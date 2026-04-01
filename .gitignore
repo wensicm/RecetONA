@@ -1,11 +1,15 @@
 .env
 .env.*
 .venv/
+.aws-sam/
+.pytest_cache/
 lib/
 images/
 rag_cache/
 AGENTS.md
 __pycache__/
+node_modules/
+dist/
 *.key
 *.pem
 *.p12

@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RecetONA MCP Inspector</title>
+    <style>
+      :root {
+        --bg: #0e1418;
+        --bg-2: #121d23;
+        --panel: #17252d;
+        --panel-2: #20343f;
+        --line: rgba(183, 149, 102, 0.18);
+        --text: #eef2f1;
+        --muted: #96a9ad;
+        --accent: #d38a36;
+        --accent-2: #79d0b0;
+        --danger: #ff8f8f;
+        --shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top right, rgba(211, 138, 54, 0.16), transparent 28%),
+          linear-gradient(180deg, #0d1317 0%, var(--bg) 100%);
+        color: var(--text);
+        font:
+          15px/1.5 "IBM Plex Sans", "Segoe UI", Inter, system-ui,
+          sans-serif;
+      }
+
+      .app {
+        width: min(1400px, calc(100vw - 32px));
+        margin: 24px auto;
+        display: grid;
+        gap: 18px;
+      }
+
+      .hero {
+        padding: 22px 24px;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background:
+          linear-gradient(135deg, rgba(211, 138, 54, 0.16), transparent 40%),
+          linear-gradient(180deg, rgba(31, 48, 57, 0.96), rgba(19, 31, 37, 0.98));
+        box-shadow: var(--shadow);
+      }
+
+      .eyebrow {
+        margin: 0 0 6px;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1.05;
+      }
+
+      .hero p {
+        max-width: 72ch;
+        color: var(--muted);
+        margin: 10px 0 0;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
+        gap: 18px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background:
+          linear-gradient(180deg, rgba(24, 38, 46, 0.96), rgba(18, 29, 35, 0.98));
+        box-shadow: var(--shadow);
+      }
+
+      .controls {
+        padding: 18px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .section-title {
+        margin: 0;
+        font-size: 0.95rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .field {
+        display: grid;
+        gap: 7px;
+      }
+
+      .field label {
+        font-size: 0.88rem;
+        color: #d9e3e1;
+      }
+
+      input,
+      select,
+      textarea,
+      button {
+        font: inherit;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid rgba(161, 181, 184, 0.16);
+        border-radius: 14px;
+        background: rgba(12, 20, 24, 0.72);
+        color: var(--text);
+        padding: 12px 14px;
+        outline: none;
+      }
+
+      textarea {
+        min-height: 170px;
+        resize: vertical;
+        font:
+          13px/1.5 ui-monospace, "SFMono-Regular", "SF Mono", Menlo,
+          Consolas, monospace;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: rgba(121, 208, 176, 0.55);
+        box-shadow: 0 0 0 3px rgba(121, 208, 176, 0.12);
+      }
+
+      .action-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .action-grid button,
+      .primary {
+        border: 0;
+        border-radius: 14px;
+        padding: 12px 14px;
+        cursor: pointer;
+        transition:
+          transform 140ms ease,
+          filter 140ms ease,
+          background 140ms ease;
+      }
+
+      .action-grid button {
+        background: rgba(211, 138, 54, 0.12);
+        color: #f8ddbb;
+      }
+
+      .action-grid button:hover,
+      .primary:hover {
+        filter: brightness(1.06);
+      }
+
+      .action-grid button:active,
+      .primary:active {
+        transform: translateY(1px);
+      }
+
+      .primary {
+        background: linear-gradient(135deg, var(--accent), #f0a454);
+        color: #261606;
+        font-weight: 700;
+      }
+
+      .hint {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .status {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 14px 18px 0;
+      }
+
+      .status-pill {
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      .status-pill strong {
+        color: var(--text);
+      }
+
+      .status-pill.ok strong {
+        color: var(--accent-2);
+      }
+
+      .status-pill.error strong {
+        color: var(--danger);
+      }
+
+      .panels {
+        padding: 18px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .panel-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .panel {
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 18px;
+        overflow: hidden;
+        background: rgba(10, 17, 21, 0.5);
+      }
+
+      .panel header {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .panel header h2 {
+        margin: 0;
+        font-size: 0.9rem;
+      }
+
+      .panel pre {
+        margin: 0;
+        padding: 14px;
+        min-height: 220px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: #dde6e3;
+        font:
+          13px/1.52 ui-monospace, "SFMono-Regular", "SF Mono", Menlo,
+          Consolas, monospace;
+      }
+
+      .panel.wide pre {
+        min-height: 260px;
+      }
+
+      @media (max-width: 1080px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 820px) {
+        body {
+          padding: 12px;
+        }
+
+        .app {
+          width: 100%;
+          margin: 0 auto;
+        }
+
+        .panel-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <section class="hero card">
+        <p class="eyebrow">RecetONA</p>
+        <h1>MCP Inspector</h1>
+        <p>
+          Visor local para ver las respuestas del MCP tal como llegan por
+          streamable-http: request JSON-RPC, response JSON crudo, y desglose de
+          <code>result.content</code>, <code>result.structuredContent</code> y
+          <code>result._meta</code>.
+        </p>
+      </section>
+
+      <section class="layout">
+        <aside class="card controls">
+          <div class="field">
+            <label for="endpoint">Endpoint MCP</label>
+            <input
+              id="endpoint"
+              type="url"
+              value="https://api.wensicm.com/recetona/mcp"
+            />
+          </div>
+
+          <div>
+            <p class="section-title">Acciones rápidas</p>
+            <div class="action-grid">
+              <button type="button" data-preset="initialize">
+                Initialize
+              </button>
+              <button type="button" data-preset="tools-list">
+                Tools list
+              </button>
+              <button type="button" data-preset="query-recipe">
+                Query recipe
+              </button>
+              <button type="button" data-preset="read-widget">
+                Read widget
+              </button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="method">Método JSON-RPC</label>
+            <select id="method">
+              <option value="initialize">initialize</option>
+              <option value="tools/list">tools/list</option>
+              <option value="tools/call" selected>tools/call</option>
+              <option value="resources/read">resources/read</option>
+            </select>
+          </div>
+
+          <div class="field" id="toolNameField">
+            <label for="toolName">Tool name</label>
+            <input id="toolName" type="text" value="query_recipe" />
+          </div>
+
+          <div class="field" id="resourceUriField" hidden>
+            <label for="resourceUri">Resource URI</label>
+            <input
+              id="resourceUri"
+              type="text"
+              value="ui://widget/recetona-recipe-v1.html"
+            />
+          </div>
+
+          <div class="field">
+            <label for="params">
+              Parámetros
+              <span class="hint">
+                Para <code>tools/call</code> pon solo el objeto
+                <code>arguments</code>.
+              </span>
+            </label>
+            <textarea id="params">{
+  "pregunta": "Receta de brownie con nueces"
+}</textarea>
+          </div>
+
+          <button id="sendButton" class="primary" type="button">
+            Enviar request
+          </button>
+
+          <p class="hint">
+            Este visor usa el MCP remoto en modo stateless. No intenta “pintar”
+            la respuesta como ChatGPT: solo enseña el JSON que devuelve el
+            servidor.
+          </p>
+        </aside>
+
+        <section class="card">
+          <div class="status">
+            <div class="status-pill">
+              HTTP <strong id="httpStatus">-</strong>
+            </div>
+            <div class="status-pill">
+              Tipo <strong id="contentType">-</strong>
+            </div>
+            <div class="status-pill">
+              Error <strong id="errorStatus">ninguno</strong>
+            </div>
+          </div>
+
+          <div class="panels">
+            <div class="panel-grid">
+              <article class="panel">
+                <header><h2>Request JSON-RPC</h2></header>
+                <pre id="requestPreview">{}</pre>
+              </article>
+
+              <article class="panel">
+                <header><h2>Response JSON crudo</h2></header>
+                <pre id="responsePreview">Todavía no hay respuesta.</pre>
+              </article>
+            </div>
+
+            <div class="panel-grid">
+              <article class="panel">
+                <header><h2>result.content</h2></header>
+                <pre id="contentPreview">-</pre>
+              </article>
+
+              <article class="panel">
+                <header><h2>result._meta</h2></header>
+                <pre id="metaPreview">-</pre>
+              </article>
+            </div>
+
+            <article class="panel wide">
+              <header><h2>result.structuredContent</h2></header>
+              <pre id="structuredPreview">-</pre>
+            </article>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script>
+      const STORAGE_KEY = "recetona-mcp-inspector";
+      const endpointInput = document.getElementById("endpoint");
+      const methodSelect = document.getElementById("method");
+      const toolNameField = document.getElementById("toolNameField");
+      const toolNameInput = document.getElementById("toolName");
+      const resourceUriField = document.getElementById("resourceUriField");
+      const resourceUriInput = document.getElementById("resourceUri");
+      const paramsInput = document.getElementById("params");
+      const sendButton = document.getElementById("sendButton");
+      const requestPreview = document.getElementById("requestPreview");
+      const responsePreview = document.getElementById("responsePreview");
+      const contentPreview = document.getElementById("contentPreview");
+      const metaPreview = document.getElementById("metaPreview");
+      const structuredPreview = document.getElementById("structuredPreview");
+      const httpStatus = document.getElementById("httpStatus");
+      const contentType = document.getElementById("contentType");
+      const errorStatus = document.getElementById("errorStatus");
+
+      let requestCounter = 1;
+
+      function pretty(value) {
+        if (value === undefined) {
+          return "-";
+        }
+        if (typeof value === "string") {
+          try {
+            const parsed = JSON.parse(value);
+            return JSON.stringify(parsed, null, 2);
+          } catch (_error) {
+            return value;
+          }
+        }
+        return JSON.stringify(value, null, 2);
+      }
+
+      function setStatus({ status, type, error }) {
+        httpStatus.textContent = status || "-";
+        contentType.textContent = type || "-";
+        errorStatus.textContent = error || "ninguno";
+        errorStatus.parentElement.className =
+          "status-pill" + (error ? " error" : " ok");
+      }
+
+      function updateVisibility() {
+        const method = methodSelect.value;
+        toolNameField.hidden = method !== "tools/call";
+        resourceUriField.hidden = method !== "resources/read";
+      }
+
+      function saveState() {
+        const payload = {
+          endpoint: endpointInput.value,
+          method: methodSelect.value,
+          toolName: toolNameInput.value,
+          resourceUri: resourceUriInput.value,
+          params: paramsInput.value,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      }
+
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) {
+            return;
+          }
+          const state = JSON.parse(raw);
+          endpointInput.value = state.endpoint || endpointInput.value;
+          methodSelect.value = state.method || methodSelect.value;
+          toolNameInput.value = state.toolName || toolNameInput.value;
+          resourceUriInput.value = state.resourceUri || resourceUriInput.value;
+          paramsInput.value = state.params || paramsInput.value;
+        } catch (_error) {}
+      }
+
+      function setPreset(name) {
+        if (name === "initialize") {
+          methodSelect.value = "initialize";
+          paramsInput.value = JSON.stringify(
+            {
+              protocolVersion: "2025-03-26",
+              capabilities: {},
+              clientInfo: {
+                name: "recetona-local-viewer",
+                version: "0.1.0",
+              },
+            },
+            null,
+            2
+          );
+        }
+
+        if (name === "tools-list") {
+          methodSelect.value = "tools/list";
+          paramsInput.value = "{}";
+        }
+
+        if (name === "query-recipe") {
+          methodSelect.value = "tools/call";
+          toolNameInput.value = "query_recipe";
+          paramsInput.value = JSON.stringify(
+            {
+              pregunta: "Receta de brownie con nueces",
+            },
+            null,
+            2
+          );
+        }
+
+        if (name === "read-widget") {
+          methodSelect.value = "resources/read";
+          resourceUriInput.value = "ui://widget/recetona-recipe-v1.html";
+          paramsInput.value = "{}";
+        }
+
+        updateVisibility();
+        saveState();
+      }
+
+      function buildRequestEnvelope() {
+        const method = methodSelect.value;
+        let params;
+
+        try {
+          params = JSON.parse(paramsInput.value || "{}");
+        } catch (error) {
+          throw new Error("El JSON de parámetros no es válido.");
+        }
+
+        if (method === "tools/call") {
+          params = {
+            name: toolNameInput.value.trim(),
+            arguments: params,
+          };
+        }
+
+        if (method === "resources/read") {
+          params = {
+            uri: resourceUriInput.value.trim(),
+          };
+        }
+
+        return {
+          jsonrpc: "2.0",
+          id: "viewer-" + requestCounter++,
+          method,
+          params,
+        };
+      }
+
+      async function sendRequest() {
+        saveState();
+
+        let envelope;
+        try {
+          envelope = buildRequestEnvelope();
+        } catch (error) {
+          setStatus({
+            status: "-",
+            type: "-",
+            error: error.message,
+          });
+          requestPreview.textContent = "{}";
+          responsePreview.textContent = error.message;
+          contentPreview.textContent = "-";
+          metaPreview.textContent = "-";
+          structuredPreview.textContent = "-";
+          return;
+        }
+
+        requestPreview.textContent = pretty(envelope);
+        responsePreview.textContent = "Cargando...";
+        contentPreview.textContent = "-";
+        metaPreview.textContent = "-";
+        structuredPreview.textContent = "-";
+        setStatus({ status: "...", type: "...", error: "" });
+
+        try {
+          const response = await fetch(endpointInput.value.trim(), {
+            method: "POST",
+            headers: {
+              Accept: "application/json, text/event-stream",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(envelope),
+          });
+
+          const rawText = await response.text();
+          let parsed;
+          try {
+            parsed = JSON.parse(rawText);
+          } catch (_error) {
+            parsed = rawText;
+          }
+
+          responsePreview.textContent = pretty(parsed);
+          setStatus({
+            status: String(response.status),
+            type: response.headers.get("content-type") || "-",
+            error: parsed?.error?.message || "",
+          });
+
+          const result = parsed?.result;
+          contentPreview.textContent = pretty(result?.content);
+          metaPreview.textContent = pretty(result?._meta);
+          structuredPreview.textContent = pretty(
+            result?.structuredContent ?? parsed?.structuredContent
+          );
+        } catch (error) {
+          responsePreview.textContent = String(error);
+          setStatus({
+            status: "-",
+            type: "-",
+            error: error.message || String(error),
+          });
+        }
+      }
+
+      document.querySelectorAll("[data-preset]").forEach((button) => {
+        button.addEventListener("click", () => {
+          setPreset(button.dataset.preset);
+        });
+      });
+
+      [endpointInput, methodSelect, toolNameInput, resourceUriInput, paramsInput]
+        .forEach((element) => {
+          element.addEventListener("change", () => {
+            updateVisibility();
+            saveState();
+          });
+        });
+
+      sendButton.addEventListener("click", sendRequest);
+      methodSelect.addEventListener("change", updateVisibility);
+
+      loadState();
+      updateVisibility();
+      if (!localStorage.getItem(STORAGE_KEY)) {
+        setPreset("query-recipe");
+      }
+    </script>
+  </body>
+</html>

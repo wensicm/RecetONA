@@ -1,0 +1,142 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  API Gateway + Lambda para exponer la ChatGPT App de RecetONA como
+  servidor MCP remoto con widget.
+
+Parameters:
+  FailureTopicArn:
+    Type: String
+    Default: ""
+    Description: >
+      ARN del topic SNS para OnFailure. En HTTP sincrono no se usa en la
+      peticion normal, pero queda preparado para invocaciones asincronas.
+  ExistingCustomDomainName:
+    Type: String
+    Default: api.wensicm.com
+    Description: Dominio publico ya existente donde se colgara la app.
+  CustomDomainBasePath:
+    Type: String
+    Default: recetona/app
+    Description: Base path del API mapping bajo el dominio publico existente.
+  OpenAiApiKeyParameterName:
+    Type: String
+    Default: OPENAI_API_KEY
+    Description: Nombre del SecureString en SSM con la API key de OpenAI.
+  ExistingRagCacheBucketName:
+    Type: String
+    Default: recetona-mcp-recetonaragcachebucket-bzqmbddjds7z
+    Description: Bucket S3 ya existente donde vive la cache RAG.
+  ExistingRagCachePrefix:
+    Type: String
+    Default: recetona/rag_cache
+    Description: Prefijo S3 dentro del bucket donde viven chunks y embeddings.
+
+Conditions:
+  HasFailureTopicArn: !Not [!Equals [!Ref FailureTopicArn, ""]]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures:
+      - arm64
+    MemorySize: 2048
+    Timeout: 29
+    Tracing: Active
+    Environment:
+      Variables:
+        PYTHONPATH: /var/task:/var/task/src
+        RECETONA_REQUIRE_PREBUILT_RAG_CACHE: "true"
+        RECETONA_EMBED_MODEL: text-embedding-3-large
+        RECETONA_CHAT_MODEL: gpt-5.4-nano
+        RECETONA_RAG_CACHE_DIR: /tmp/recetona_rag_cache
+        RECETONA_RAG_CACHE_S3_BUCKET: !Ref ExistingRagCacheBucketName
+        RECETONA_RAG_CACHE_S3_PREFIX: !Ref ExistingRagCachePrefix
+        OPENAI_API_KEY_SSM_PARAMETER: !Ref OpenAiApiKeyParameterName
+
+Resources:
+  RecetonaChatgptAppApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - authorization
+          - content-type
+          - mcp-session-id
+        AllowMethods:
+          - GET
+          - POST
+          - DELETE
+          - OPTIONS
+        ExposeHeaders:
+          - mcp-session-id
+
+  RecetonaChatgptAppFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      Handler: app.lambda_handler
+      CodeUri: .
+      Policies:
+        - Statement:
+            - Sid: ReadOpenAiApiKeyFromSsm
+              Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${OpenAiApiKeyParameterName}"
+            - Sid: ReadRagCacheFromS3
+              Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub "arn:aws:s3:::${ExistingRagCacheBucketName}/${ExistingRagCachePrefix}/*"
+      Events:
+        Default:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref RecetonaChatgptAppApi
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref RecetonaChatgptAppApi
+            Path: /
+            Method: ANY
+        Health:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref RecetonaChatgptAppApi
+            Path: /health
+            Method: GET
+
+  RecetonaChatgptAppEventInvokeConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    Condition: HasFailureTopicArn
+    Properties:
+      FunctionName: !Ref RecetonaChatgptAppFunction
+      Qualifier: "$LATEST"
+      DestinationConfig:
+        OnFailure:
+          Destination: !Ref FailureTopicArn
+
+Outputs:
+  HttpApiBaseUrl:
+    Description: URL base del API Gateway HTTP.
+    Value: !Sub "https://${RecetonaChatgptAppApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  HealthUrl:
+    Description: Endpoint de health check.
+    Value: !Sub "https://${RecetonaChatgptAppApi}.execute-api.${AWS::Region}.amazonaws.com/health"
+
+  McpUrl:
+    Description: Endpoint MCP remoto para ChatGPT Apps.
+    Value: !Sub "https://${RecetonaChatgptAppApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  CustomDomainBaseUrl:
+    Description: URL base prevista bajo el custom domain existente.
+    Value: !Sub "https://${ExistingCustomDomainName}/${CustomDomainBasePath}"
+
+  CustomDomainMcpUrl:
+    Description: Endpoint MCP remoto previsto bajo custom domain.
+    Value: !Sub "https://${ExistingCustomDomainName}/${CustomDomainBasePath}"
