@@ -12,6 +12,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel, Field
+
 BASE_DIR = Path(__file__).resolve().parent
 NOTEBOOK_PATH = BASE_DIR / "mercadona_rag_notebook.ipynb"
 ENV_PATH = BASE_DIR / ".env"
@@ -82,6 +84,10 @@ BEEF_BROTH_INGREDIENT_PATTERN = re.compile(
     r"\bcaldo de (?:carne|res|vacuno|ternera)\b"
 )
 GELATIN_INGREDIENT_PATTERN = re.compile(r"\bgelatina\b")
+CREAM_CHEESE_INGREDIENT_PATTERN = re.compile(
+    r"\b(?:queso crema|queso de untar|queso untable|philadelphia|"
+    r"mascarpone)\b"
+)
 PAPRIKA_INGREDIENT_PATTERN = re.compile(r"\bpimenton\b")
 BEEF_INGREDIENT_PATTERN = re.compile(
     r"\b(?:carne de (?:res|vacuno|ternera)|vacuno|ternera)\b"
@@ -96,8 +102,70 @@ NON_RECIPE_TAXONOMY_PATTERN = re.compile(
     r"parafarmacia|perfume|perro"
     r")\b"
 )
+FLAVORED_GELATIN_TOKENS = {
+    "arandano",
+    "cereza",
+    "cola",
+    "fresa",
+    "frutos",
+    "limon",
+    "mandarina",
+    "mango",
+    "maracuya",
+    "pina",
+    "proteinas",
+    "sabores",
+    "sabor",
+    "sandia",
+    "silvestres",
+}
+CREAM_CHEESE_NEUTRAL_TOKENS = {
+    "crema",
+    "mascarpone",
+    "philadelphia",
+    "queso",
+    "untar",
+    "untable",
+}
+CREAM_CHEESE_FORBIDDEN_TOKENS = {
+    "azul",
+    "cabra",
+    "camembert",
+    "cebolla",
+    "finas",
+    "hierbas",
+    "salmon",
+    "atun",
+}
 
 _RUNTIME_CACHE_LOCK = threading.Lock()
+NON_SHOPPING_INGREDIENTS = {"agua"}
+
+
+class RecipeDraftPlan(BaseModel):
+    titulo: str = ""
+    personas: int | None = None
+    ingredientes: list[str] = Field(default_factory=list)
+
+
+class RecipeFinalPlan(BaseModel):
+    titulo: str = ""
+    ingredientes_usados: list[str] = Field(default_factory=list)
+    receta: str = ""
+
+
+def _get_reasoning_effort() -> str | None:
+    effort = os.getenv("RECETONA_REASONING_EFFORT", "").strip().lower()
+    if not effort:
+        return "none"
+    return effort
+
+
+def _get_reasoning_options() -> dict[str, str] | None:
+    effort = _get_reasoning_effort()
+    if not effort:
+        return None
+    return {"effort": effort}
 
 
 def load_env_file(path: Path) -> None:
@@ -333,6 +401,19 @@ def _candidate_is_incompatible_for_ingredient(
     if GELATIN_INGREDIENT_PATTERN.search(ingredient_text):
         if "gelatina" not in product_name_tokens:
             return True
+        if product_name_tokens & FLAVORED_GELATIN_TOKENS:
+            return True
+        if "postres" in haystack_tokens:
+            return True
+
+    if CREAM_CHEESE_INGREDIENT_PATTERN.search(ingredient_text):
+        if not (
+            product_name_tokens & CREAM_CHEESE_NEUTRAL_TOKENS
+            or haystack_tokens & {"untable", "untar"}
+        ):
+            return True
+        if product_name_tokens & CREAM_CHEESE_FORBIDDEN_TOKENS:
+            return True
 
     if BEEF_BROTH_INGREDIENT_PATTERN.search(ingredient_text):
         if "caldo" not in product_name_tokens:
@@ -401,6 +482,47 @@ def _filter_incompatible_ingredient_candidates(
     return df_hits.iloc[0:0].copy()
 
 
+def _filter_non_shopping_ingredients(
+    ingredients: list[str],
+) -> list[str]:
+    filtered_ingredients: list[str] = []
+
+    for ingredient in ingredients:
+        normalized_ingredient = _normalize_matching_text(ingredient)
+        if normalized_ingredient in NON_SHOPPING_INGREDIENTS:
+            continue
+        filtered_ingredients.append(ingredient)
+
+    return filtered_ingredients
+
+
+def _filter_cost_plan_catalog_plausibility(
+    plan_df: Any,
+    *,
+    recipe_query: str,
+) -> Any:
+    if plan_df is None or getattr(plan_df, "empty", True):
+        return plan_df
+
+    compatible_rows = []
+    for _, row in plan_df.iterrows():
+        ingredient = _normalize_matching_text(row.get("ingredient"))
+        if not ingredient or ingredient in NON_SHOPPING_INGREDIENTS:
+            continue
+        if _candidate_is_incompatible_for_ingredient(
+            ingredient,
+            row,
+            recipe_query=recipe_query,
+        ):
+            continue
+        compatible_rows.append(row.to_dict())
+
+    if not compatible_rows:
+        return plan_df.iloc[0:0].copy()
+
+    return plan_df.__class__(compatible_rows)
+
+
 def _collect_missing_recipe_ingredients(
     plan_df: Any,
     *,
@@ -432,6 +554,335 @@ def _collect_missing_recipe_ingredients(
             break
 
     return missing_ingredients
+
+
+def _extract_parsed_response_payload(response: Any) -> Any | None:
+    for output in getattr(response, "output", []):
+        if getattr(output, "type", None) != "message":
+            continue
+        for content_item in getattr(output, "content", []):
+            if getattr(content_item, "type", None) == "refusal":
+                return None
+            parsed_payload = getattr(content_item, "parsed", None)
+            if parsed_payload is not None:
+                return parsed_payload
+    return None
+
+
+def _call_structured_response(
+    *,
+    client: Any,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    text_format: type[BaseModel],
+    max_output_tokens: int,
+) -> tuple[Any, Any]:
+    request_kwargs: dict[str, Any] = {
+        "model": model,
+        "input": [
+            {
+                "role": "system",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": system_prompt,
+                    }
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": user_prompt,
+                    }
+                ],
+            },
+        ],
+        "text_format": text_format,
+        "temperature": 0,
+        "max_output_tokens": max_output_tokens,
+    }
+    reasoning = _get_reasoning_options()
+    if reasoning:
+        request_kwargs["reasoning"] = reasoning
+
+    response = client.responses.parse(**request_kwargs)
+    parsed_payload = _extract_parsed_response_payload(response)
+    if parsed_payload is None:
+        raise RuntimeError(
+            "La respuesta estructurada del modelo no es valida."
+        )
+    return parsed_payload, response
+
+
+def _canonicalize_recipe_ingredient_name(value: Any) -> str:
+    normalized_value = _normalize_matching_text(value)
+    normalized_value = re.sub(r"\s+", " ", normalized_value).strip()
+    return normalized_value.strip(" ,.;:-")
+
+
+def _dedupe_recipe_ingredient_names(values: list[Any]) -> list[str]:
+    deduped_values: list[str] = []
+    seen: set[str] = set()
+
+    for value in values:
+        normalized_value = _canonicalize_recipe_ingredient_name(value)
+        if not normalized_value or normalized_value in seen:
+            continue
+        seen.add(normalized_value)
+        deduped_values.append(normalized_value)
+
+    return deduped_values
+
+
+def _ingredient_matches_used_ingredient(
+    ingredient_name: Any,
+    used_ingredients: list[str],
+) -> bool:
+    normalized_ingredient = _canonicalize_recipe_ingredient_name(
+        ingredient_name
+    )
+    if not normalized_ingredient:
+        return False
+
+    ingredient_tokens = set(re.findall(r"[a-z0-9]+", normalized_ingredient))
+    for raw_used_ingredient in used_ingredients:
+        normalized_used_ingredient = _canonicalize_recipe_ingredient_name(
+            raw_used_ingredient
+        )
+        if not normalized_used_ingredient:
+            continue
+        if normalized_used_ingredient == normalized_ingredient:
+            return True
+
+        used_tokens = set(re.findall(r"[a-z0-9]+", normalized_used_ingredient))
+        if len(used_tokens) >= 2 and used_tokens <= ingredient_tokens:
+            return True
+        if len(ingredient_tokens) >= 2 and ingredient_tokens <= used_tokens:
+            return True
+
+    return False
+
+
+def _filter_cost_plan_to_used_ingredients(
+    plan_df: Any,
+    *,
+    used_ingredients: list[str],
+) -> Any:
+    if plan_df is None or getattr(plan_df, "empty", True):
+        return plan_df
+
+    normalized_used_ingredients = _dedupe_recipe_ingredient_names(
+        list(used_ingredients)
+    )
+    if not normalized_used_ingredients:
+        return plan_df
+
+    filtered_mask = plan_df["ingredient"].apply(
+        lambda ingredient_name: _ingredient_matches_used_ingredient(
+            ingredient_name,
+            normalized_used_ingredients,
+        )
+    )
+
+    if bool(filtered_mask.any()):
+        return plan_df.loc[filtered_mask].reset_index(drop=True)
+
+    return plan_df
+
+
+def _summarize_cost_plan(
+    plan_df: Any,
+    *,
+    servings: int,
+) -> dict[str, Any]:
+    if plan_df is None or getattr(plan_df, "empty", True):
+        return {
+            "servings": servings,
+            "total_purchase_eur": 0.0,
+            "total_escandallo_eur": 0.0,
+            "missing_purchase_ingredients": [],
+            "missing_escandallo_ingredients": [],
+        }
+
+    purchase_cost_series = plan_df["purchase_cost_eur"].dropna()
+    escandallo_cost_series = plan_df["escandallo_cost_eur"].dropna()
+    missing_purchase = plan_df[plan_df["purchase_cost_eur"].isna()][
+        "ingredient"
+    ].tolist()
+    missing_escandallo = plan_df[plan_df["escandallo_cost_eur"].isna()][
+        "ingredient"
+    ].tolist()
+
+    return {
+        "servings": servings,
+        "total_purchase_eur": (
+            float(purchase_cost_series.sum())
+            if not purchase_cost_series.empty
+            else 0.0
+        ),
+        "total_escandallo_eur": (
+            float(escandallo_cost_series.sum())
+            if not escandallo_cost_series.empty
+            else 0.0
+        ),
+        "missing_purchase_ingredients": missing_purchase,
+        "missing_escandallo_ingredients": missing_escandallo,
+    }
+
+
+def _build_recipe_draft_prompt(
+    *,
+    query: str,
+    servings: int,
+    inferred_ingredients: list[str],
+) -> str:
+    hints_text = ""
+    cleaned_hints = _dedupe_recipe_ingredient_names(inferred_ingredients)
+    if cleaned_hints:
+        hints_text = (
+            "Pistas del recuperador actual, usalas solo si tienen sentido:\n"
+            + "\n".join(f"- {ingredient}" for ingredient in cleaned_hints)
+            + "\n\n"
+        )
+
+    return (
+        f"Solicitud del usuario: {query}\n"
+        f"Personas objetivo: {servings}\n\n"
+        f"{hints_text}"
+        "Devuelve un plan base de receta, no la respuesta final.\n"
+        "Reglas:\n"
+        "- Genera un titulo corto y natural en espanol.\n"
+        "- Incluye ingredientes nucleares, buscables en catalogo, sin marca.\n"
+        "- Excluye guarniciones opcionales, sugerencias de servido y agua "
+        "salvo que sea esencial.\n"
+        "- Prioriza ingredientes reales del plato, no utensilios ni tecnicas.\n"
+        "- Usa nombres cortos como 'pollo', 'curry', 'leche de coco', "
+        "'cebolla', 'ajo' o 'queso crema'.\n"
+        "- No inventes productos ni precios.\n"
+        "- Si la solicitud nombra un ingrediente principal, debe aparecer "
+        "en la lista salvo que la receta no lo necesite de verdad."
+    )
+
+
+def _build_available_products_prompt_text(
+    plan_df: Any,
+    *,
+    max_items: int = 18,
+) -> str:
+    if plan_df is None or getattr(plan_df, "empty", True):
+        return "No hay productos concretos disponibles."
+
+    lines: list[str] = []
+    for _, row in plan_df.head(max_items).iterrows():
+        ingredient = str(row.get("ingredient") or "").strip()
+        product_name = str(row.get("product_name") or "").strip()
+        if not product_name or product_name.lower() == "nan":
+            continue
+
+        quantity_text = "cantidad N/D"
+        required_qty = row.get("required_qty")
+        required_unit = row.get("required_unit")
+        try:
+            quantity_text = (
+                f"{required_qty:g} {required_unit}"
+                if isinstance(required_qty, (int, float))
+                else f"{required_qty} {required_unit}"
+            ).strip()
+        except Exception:
+            quantity_text = f"{required_qty} {required_unit}".strip()
+
+        price_value = row.get("purchase_cost_eur")
+        if isinstance(price_value, (int, float)):
+            price_text = f"{price_value:.2f} €"
+        else:
+            price_text = "N/D"
+
+        lines.append(
+            "- "
+            f"etiqueta={ingredient}; "
+            f"producto={product_name}; "
+            f"cantidad={quantity_text}; "
+            f"compra_total={price_text}"
+        )
+
+    return (
+        "\n".join(lines)
+        if lines
+        else "No hay productos concretos disponibles."
+    )
+
+
+def _build_final_recipe_prompt(
+    *,
+    query: str,
+    draft_plan: RecipeDraftPlan,
+    plan_df: Any,
+    max_chars: int,
+) -> str:
+    available_products_text = _build_available_products_prompt_text(plan_df)
+    missing_ingredients = _collect_missing_recipe_ingredients(plan_df)
+    available_ingredients = {
+        _normalize_matching_text(row.get("ingredient"))
+        for _, row in (
+            plan_df.iterrows()
+            if plan_df is not None and not getattr(plan_df, "empty", True)
+            else []
+        )
+        if _normalize_matching_text(row.get("ingredient"))
+    }
+    for ingredient in draft_plan.ingredientes:
+        normalized_ingredient = _normalize_matching_text(ingredient)
+        if (
+            normalized_ingredient
+            and normalized_ingredient not in available_ingredients
+            and ingredient not in missing_ingredients
+        ):
+            missing_ingredients.append(ingredient)
+    missing_text = "Ninguno"
+    if missing_ingredients:
+        missing_text = "\n".join(
+            f"- {ingredient}" for ingredient in missing_ingredients
+        )
+
+    desired_ingredients_text = "\n".join(
+        f"- {ingredient}" for ingredient in draft_plan.ingredientes
+    )
+    if not desired_ingredients_text:
+        desired_ingredients_text = "- Sin ingredientes sugeridos"
+
+    return (
+        f"Solicitud del usuario: {query}\n"
+        f"Titulo base: {draft_plan.titulo or 'Receta'}\n"
+        f"Personas: {draft_plan.personas or 4}\n\n"
+        "Ingredientes deseados del plato:\n"
+        f"{desired_ingredients_text}\n\n"
+        "Productos disponibles seleccionados desde el catalogo:\n"
+        f"{available_products_text}\n\n"
+        "Ingredientes deseados sin producto exacto disponible:\n"
+        f"{missing_text}\n\n"
+        "Escribe la receta final adaptada al catalogo disponible.\n"
+        "Reglas estrictas:\n"
+        f"- Maximo {max_chars} caracteres en receta.\n"
+        "- Usa solo productos disponibles de la lista anterior.\n"
+        "- Si falta un ingrediente habitual, adapta la receta a lo que si "
+        "esta disponible y no lo menciones como si existiera.\n"
+        "- No renombres un producto disponible como si fuera otro distinto.\n"
+        "- No conviertas mantequilla en 'mantequilla de cacao'.\n"
+        "- No conviertas una gelatina con sabor, un postre gelificado o un "
+        "preparado saborizado en gelatina neutra, en hojas o en laminas.\n"
+        "- No conviertas un queso con sabor especifico, como camembert, en "
+        "queso crema neutro.\n"
+        "- La lista ingredientes_usados debe contener solo etiquetas "
+        "exactas del campo etiqueta=... de los productos disponibles que "
+        "realmente usas en la receta final.\n"
+        "- No incluyas guarniciones opcionales ni sugerencias de servido.\n"
+        "- No inventes precios ni productos.\n"
+        "- Mantén el plato reconocible y viable.\n"
+        "- Devuelve la receta final en espanol con pasos claros."
+    )
 
 
 def _build_recipe_generation_prompt(
@@ -492,6 +943,221 @@ def _build_recipe_generation_prompt(
         f"- No inventes precios.\n"
         f"- Devuelve solo el texto de la receta."
     )
+
+
+def _run_two_phase_recipe_pipeline(
+    namespace: dict[str, Any],
+    *,
+    query: str,
+    top_k: int,
+    model: str,
+    retrieval_mode: str,
+    alpha: float,
+    recipe_mode: str,
+    use_ingredient_tool: bool,
+    candidates_per_ingredient: int,
+) -> dict[str, Any]:
+    retrieve = namespace["retrieve"]
+    parse_servings = namespace["parse_servings"]
+    tool_get_products_for_ingredients = namespace[
+        "tool_get_products_for_ingredients"
+    ]
+    build_recipe_cost_plan = namespace["build_recipe_cost_plan"]
+    format_ingredient_catalog_text = namespace[
+        "format_ingredient_catalog_text"
+    ]
+    format_cost_plan_text = namespace["format_cost_plan_text"]
+    build_block1_ingredients_mercadona = namespace[
+        "build_block1_ingredients_mercadona"
+    ]
+    tool_get_total_purchase_price = namespace["tool_get_total_purchase_price"]
+    compose_structured_answer = namespace["compose_structured_answer"]
+    catalog_preview = namespace["_catalog_preview"]
+    remove_redundant_ingredients = namespace["_remove_redundant_ingredients"]
+    build_block3_recipe_text = namespace["build_block3_recipe_text"]
+    client = namespace["client"]
+
+    hits, subqueries, inferred_ingredients = retrieve(
+        query,
+        top_k=top_k,
+        mode=retrieval_mode,
+        alpha=alpha,
+        recipe_mode=recipe_mode,
+    )
+    servings = parse_servings(query, default=4)
+
+    draft_plan, raw_draft_response = _call_structured_response(
+        client=client,
+        model=model,
+        system_prompt=(
+            "Eres el planificador culinario de RecetONA. Tu trabajo es "
+            "extraer un plan base de ingredientes nucleares antes de "
+            "consultar el catalogo de Mercadona."
+        ),
+        user_prompt=_build_recipe_draft_prompt(
+            query=query,
+            servings=servings,
+            inferred_ingredients=inferred_ingredients,
+        ),
+        text_format=RecipeDraftPlan,
+        max_output_tokens=250,
+    )
+    cleaned_draft_ingredients = _dedupe_recipe_ingredient_names(
+        list(getattr(draft_plan, "ingredientes", []))
+    )
+    if not cleaned_draft_ingredients:
+        cleaned_draft_ingredients = _dedupe_recipe_ingredient_names(
+            list(inferred_ingredients)
+        )
+    cleaned_draft_ingredients = remove_redundant_ingredients(
+        cleaned_draft_ingredients
+    )
+    cleaned_draft_ingredients = _filter_non_shopping_ingredients(
+        cleaned_draft_ingredients
+    )
+    if not cleaned_draft_ingredients:
+        raise RuntimeError(
+            "No se pudieron inferir ingredientes nucleares para la receta."
+        )
+
+    ingredient_catalog = {}
+    ingredient_catalog_text = ""
+    cost_plan_df = None
+    cost_summary = _summarize_cost_plan(None, servings=servings)
+    cost_plan_text = "Sin plan de costes."
+
+    if use_ingredient_tool:
+        ingredient_catalog = tool_get_products_for_ingredients(
+            cleaned_draft_ingredients,
+            per_ingredient=candidates_per_ingredient,
+            alpha=0.35,
+            recipe_query=query,
+        )
+        ingredient_catalog_text = format_ingredient_catalog_text(
+            ingredient_catalog,
+            max_items=6,
+        )
+        cost_plan_df, cost_summary = build_recipe_cost_plan(
+            ingredient_catalog=ingredient_catalog,
+            ingredients=cleaned_draft_ingredients,
+            query=query,
+        )
+        cost_plan_df = _filter_cost_plan_catalog_plausibility(
+            cost_plan_df,
+            recipe_query=query,
+        )
+        cost_summary["servings"] = int(
+            getattr(draft_plan, "personas", None) or servings
+        )
+        cost_summary = _summarize_cost_plan(
+            cost_plan_df,
+            servings=cost_summary["servings"],
+        )
+        cost_plan_text = format_cost_plan_text(cost_plan_df, cost_summary)
+
+    final_plan, raw_final_response = _call_structured_response(
+        client=client,
+        model=model,
+        system_prompt=(
+            "Eres el cocinero final de RecetONA. Debes redactar una receta "
+            "usando solo los productos del catalogo ya seleccionados."
+        ),
+        user_prompt=_build_final_recipe_prompt(
+            query=query,
+            draft_plan=RecipeDraftPlan(
+                titulo=str(getattr(draft_plan, "titulo", "") or "").strip(),
+                personas=int(
+                    getattr(draft_plan, "personas", None) or servings
+                ),
+                ingredientes=cleaned_draft_ingredients,
+            ),
+            plan_df=cost_plan_df,
+            max_chars=1000,
+        ),
+        text_format=RecipeFinalPlan,
+        max_output_tokens=650,
+    )
+
+    recipe_text = str(getattr(final_plan, "receta", "") or "").strip()
+    if not recipe_text:
+        recipe_text, raw_final_response = build_block3_recipe_text(
+            query,
+            cost_plan_df,
+            model=model,
+            max_chars=1000,
+        )
+    elif len(recipe_text) > 1000:
+        recipe_text = recipe_text[:999].rstrip() + "…"
+
+    used_ingredients = _dedupe_recipe_ingredient_names(
+        list(getattr(final_plan, "ingredientes_usados", []))
+    )
+    if used_ingredients:
+        filtered_cost_plan_df = _filter_cost_plan_to_used_ingredients(
+            cost_plan_df,
+            used_ingredients=used_ingredients,
+        )
+    else:
+        filtered_cost_plan_df = cost_plan_df
+
+    final_servings = int(getattr(draft_plan, "personas", None) or servings)
+    final_cost_summary = _summarize_cost_plan(
+        filtered_cost_plan_df,
+        servings=final_servings,
+    )
+    final_cost_plan_text = format_cost_plan_text(
+        filtered_cost_plan_df,
+        final_cost_summary,
+    )
+    block_1 = build_block1_ingredients_mercadona(filtered_cost_plan_df)
+    block_2 = tool_get_total_purchase_price(final_cost_summary)
+    structured_answer = compose_structured_answer(
+        block_1, block_2, recipe_text
+    )
+
+    hit_cols = [
+        "product_id",
+        "product_name",
+        "category",
+        "price_unit",
+        "unit_size",
+        "size_format",
+        "score",
+    ]
+    available_hit_cols = [
+        column_name for column_name in hit_cols if column_name in hits.columns
+    ]
+    for extra_column in ("score_semantic", "score_lexical"):
+        if extra_column in hits.columns:
+            available_hit_cols.append(extra_column)
+
+    merged_inferred_ingredients = _dedupe_recipe_ingredient_names(
+        cleaned_draft_ingredients + used_ingredients
+    )
+
+    return {
+        "answer": structured_answer,
+        "block_1": block_1,
+        "block_2": block_2,
+        "block_3": recipe_text,
+        "hits": (
+            hits[available_hit_cols].copy()
+            if available_hit_cols
+            else hits.copy()
+        ),
+        "subqueries": subqueries,
+        "inferred_ingredients": merged_inferred_ingredients,
+        "ingredient_catalog": ingredient_catalog,
+        "ingredient_catalog_preview": catalog_preview(ingredient_catalog, n=3),
+        "cost_plan": filtered_cost_plan_df,
+        "cost_summary": final_cost_summary,
+        "cost_plan_text": final_cost_plan_text,
+        "ingredient_catalog_text": ingredient_catalog_text,
+        "raw_response": {
+            "draft": raw_draft_response,
+            "final": raw_final_response,
+        },
+    }
 
 
 def _patch_notebook_runtime(namespace: dict[str, Any]) -> None:
@@ -555,10 +1221,14 @@ def _patch_notebook_runtime(namespace: dict[str, Any]) -> None:
             resolved_model = model or namespace.get("CHAT_MODEL")
 
             try:
-                raw_resp = client.responses.create(
-                    model=resolved_model,
-                    input=prompt,
-                )
+                request_kwargs: dict[str, Any] = {
+                    "model": resolved_model,
+                    "input": prompt,
+                }
+                reasoning = _get_reasoning_options()
+                if reasoning:
+                    request_kwargs["reasoning"] = reasoning
+                raw_resp = client.responses.create(**request_kwargs)
                 text = (raw_resp.output_text or "").strip()
             except Exception as exc:
                 text = (
@@ -574,6 +1244,74 @@ def _patch_notebook_runtime(namespace: dict[str, Any]) -> None:
         namespace["build_block3_recipe_text"] = (
             _patched_build_block3_recipe_text
         )
+
+    original_ask_agent = namespace.get("ask_agent")
+    retrieve = namespace.get("retrieve")
+    is_recipe_query = namespace.get("is_recipe_query")
+    if (
+        callable(original_ask_agent)
+        and callable(retrieve)
+        and callable(is_recipe_query)
+        and client is not None
+    ):
+
+        def _patched_ask_agent(
+            query,
+            top_k=20,
+            model=None,
+            retrieval_mode="hybrid",
+            alpha=0.65,
+            recipe_mode="auto",
+            use_ingredient_tool=True,
+            candidates_per_ingredient=10,
+        ):
+            resolved_model = model or namespace.get("CHAT_MODEL")
+            if not (
+                use_ingredient_tool
+                and is_recipe_query(query)
+                and client is not None
+            ):
+                return original_ask_agent(
+                    query,
+                    top_k=top_k,
+                    model=resolved_model,
+                    retrieval_mode=retrieval_mode,
+                    alpha=alpha,
+                    recipe_mode=recipe_mode,
+                    use_ingredient_tool=use_ingredient_tool,
+                    candidates_per_ingredient=candidates_per_ingredient,
+                )
+
+            try:
+                return _run_two_phase_recipe_pipeline(
+                    namespace,
+                    query=query,
+                    top_k=top_k,
+                    model=resolved_model,
+                    retrieval_mode=retrieval_mode,
+                    alpha=alpha,
+                    recipe_mode=recipe_mode,
+                    use_ingredient_tool=use_ingredient_tool,
+                    candidates_per_ingredient=candidates_per_ingredient,
+                )
+            except Exception:
+                logging.warning(
+                    "Fallo el pipeline a dos fases de RecetONA. "
+                    "Se usa el flujo heredado.",
+                    exc_info=True,
+                )
+                return original_ask_agent(
+                    query,
+                    top_k=top_k,
+                    model=resolved_model,
+                    retrieval_mode=retrieval_mode,
+                    alpha=alpha,
+                    recipe_mode=recipe_mode,
+                    use_ingredient_tool=use_ingredient_tool,
+                    candidates_per_ingredient=candidates_per_ingredient,
+                )
+
+        namespace["ask_agent"] = _patched_ask_agent
 
 
 def build_notebook_runtime(notebook_path: Path) -> dict:

@@ -7,7 +7,6 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -26,14 +25,21 @@ class Settings(BaseSettings):
     catalog_csv_path: Path = PROJECT_ROOT / "data" / "catalog.csv"
     chunks_csv_path: Path = PROJECT_ROOT / "rag_cache" / "chunks.csv"
     embeddings_path: Path = PROJECT_ROOT / "rag_cache" / "embeddings.npy"
-    embeddings_hash_path: Path = PROJECT_ROOT / "rag_cache" / "embeddings.sha256"
-    scrape_checkpoint_path: Path = PROJECT_ROOT / "data" / "scrape_checkpoint.json"
+    embeddings_hash_path: Path = (
+        PROJECT_ROOT / "rag_cache" / "embeddings.sha256"
+    )
+    scrape_checkpoint_path: Path = (
+        PROJECT_ROOT / "data" / "scrape_checkpoint.json"
+    )
     legacy_excel_path: Path = PROJECT_ROOT / "mercadona_data.xlsx"
     notebook_path: Path = PROJECT_ROOT / "mercadona_rag_notebook.ipynb"
 
-    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    openai_api_key: str | None = Field(
+        default=None, validation_alias="OPENAI_API_KEY"
+    )
     embed_model: str = "text-embedding-3-small"
-    chat_model: str = "gpt-4.1-mini"
+    chat_model: str = "gpt-5.4-nano"
+    reasoning_effort: str = "none"
 
     http_host: str = "127.0.0.1"
     http_port: int = 8787

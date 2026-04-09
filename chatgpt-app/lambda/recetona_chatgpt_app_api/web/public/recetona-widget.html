@@ -7,15 +7,19 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: #f7f1e7;
-        --surface: #fffaf2;
-        --surface-strong: #fffdf8;
-        --ink: #2f2419;
-        --muted: #6f5a46;
-        --line: rgba(108, 74, 43, 0.16);
-        --accent: #9b4d12;
-        --accent-soft: rgba(155, 77, 18, 0.1);
-        --shadow: 0 18px 48px rgba(79, 48, 24, 0.12);
+        --bg: #f2f8f0;
+        --surface: #ffffff;
+        --surface-strong: #f8fcf7;
+        --ink: #1f2f24;
+        --muted: #607167;
+        --line: rgba(15, 121, 61, 0.14);
+        --brand: #10833f;
+        --brand-strong: #0b6c34;
+        --brand-soft: rgba(16, 131, 63, 0.08);
+        --accent: #f28a1a;
+        --accent-strong: #db7300;
+        --accent-soft: rgba(242, 138, 26, 0.12);
+        --shadow: 0 18px 40px rgba(31, 70, 38, 0.08);
       }
 
       * {
@@ -25,16 +29,16 @@
       body {
         margin: 0;
         background:
-          radial-gradient(
-            circle at top right,
-            rgba(225, 157, 76, 0.2),
-            transparent 34%
+          linear-gradient(
+            180deg,
+            rgba(16, 131, 63, 0.08) 0%,
+            rgba(16, 131, 63, 0) 18%
           ),
-          linear-gradient(180deg, #fff8ef 0%, var(--bg) 100%);
+          linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
         color: var(--ink);
         font:
-          15px/1.5 "Iowan Old Style", "Palatino Linotype", "Book Antiqua",
-          Georgia, serif;
+          15px/1.5 "Avenir Next", "Segoe UI", "Helvetica Neue", Arial,
+          sans-serif;
       }
 
       .shell {
@@ -42,67 +46,89 @@
       }
 
       .panel {
-        background: linear-gradient(
-          180deg,
-          var(--surface) 0%,
-          var(--surface-strong) 100%
-        );
+        background: linear-gradient(180deg, #ffffff 0%, var(--surface-strong) 100%);
         border: 1px solid var(--line);
-        border-radius: 20px;
+        border-radius: 22px;
         box-shadow: var(--shadow);
         overflow: hidden;
       }
 
       .hero {
+        position: relative;
         padding: 20px 20px 16px;
         border-bottom: 1px solid var(--line);
         background:
-          radial-gradient(
-            circle at top left,
-            rgba(155, 77, 18, 0.12),
-            transparent 28%
-          ),
           linear-gradient(
-            135deg,
-            rgba(255, 255, 255, 0.95),
-            rgba(249, 241, 228, 0.98)
-          );
+            180deg,
+            rgba(16, 131, 63, 0.05) 0%,
+            rgba(255, 255, 255, 0) 100%
+          ),
+          #ffffff;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 10px;
+        background: linear-gradient(
+          90deg,
+          var(--brand) 0 84%,
+          var(--accent) 84% 100%
+        );
       }
 
       .eyebrow {
-        margin: 0 0 6px;
+        margin: 10px 0 8px;
         font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.12em;
+        font-weight: 800;
+        letter-spacing: 0.14em;
         text-transform: uppercase;
-        color: var(--accent);
+        color: var(--brand);
       }
 
       h1 {
         margin: 0;
-        font-size: 28px;
-        line-height: 1.1;
+        font-size: 34px;
+        line-height: 1.06;
+        letter-spacing: -0.03em;
       }
 
       .stats {
         display: grid;
-        gap: 10px;
+        gap: 12px;
         grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
         padding: 14px 20px 0;
       }
 
       .stat {
+        position: relative;
         padding: 12px 14px;
         border-radius: 16px;
-        background: var(--accent-soft);
-        border: 1px solid rgba(155, 77, 18, 0.08);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: 0 8px 20px rgba(12, 80, 37, 0.04);
+      }
+
+      .stat::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 4px;
+        border-radius: 16px 16px 0 0;
+        background: var(--brand);
+      }
+
+      .stat:nth-child(3)::before,
+      .stat:nth-child(4)::before {
+        background: var(--accent);
       }
 
       .stat-label {
         margin: 0;
         font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
+        font-weight: 800;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
         color: var(--muted);
       }
@@ -111,6 +137,12 @@
         margin: 4px 0 0;
         font-size: 22px;
         line-height: 1.1;
+        color: var(--brand-strong);
+      }
+
+      .stat:nth-child(3) .stat-value,
+      .stat:nth-child(4) .stat-value {
+        color: var(--accent-strong);
       }
 
       .content {
@@ -123,13 +155,14 @@
         padding: 16px;
         border-radius: 18px;
         border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.58);
+        background: rgba(255, 255, 255, 0.96);
       }
 
       .section h2 {
         margin: 0 0 12px;
         font-size: 18px;
         line-height: 1.2;
+        color: var(--ink);
       }
 
       .ingredient-list,
@@ -138,22 +171,71 @@
         gap: 10px;
       }
 
+      .ingredient-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+      }
+
       .ingredient-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
         padding: 12px 14px;
         border-radius: 16px;
         border: 1px solid var(--line);
-        background: rgba(255, 252, 247, 0.92);
+        border-left: 5px solid var(--brand);
+        background:
+          linear-gradient(
+            90deg,
+            rgba(16, 131, 63, 0.05) 0%,
+            rgba(255, 255, 255, 0) 34%
+          ),
+          #ffffff;
+      }
+
+      .ingredient-card.with-image {
+        grid-template-columns: minmax(0, 1fr) 88px;
+        align-items: center;
+      }
+
+      .ingredient-copy {
+        min-width: 0;
       }
 
       .ingredient-name {
         margin: 0;
         font-size: 18px;
         line-height: 1.2;
+        font-weight: 700;
       }
 
       .ingredient-meta {
         margin: 8px 0 0;
         color: var(--muted);
+        font-weight: 500;
+      }
+
+      .ingredient-media {
+        width: 88px;
+        height: 88px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: linear-gradient(
+          180deg,
+          rgba(16, 131, 63, 0.08) 0%,
+          rgba(255, 255, 255, 0.96) 100%
+        );
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+
+      .ingredient-image {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
       }
 
       .step {
@@ -170,19 +252,40 @@
         width: 34px;
         height: 34px;
         border-radius: 999px;
-        background: var(--ink);
+        background: linear-gradient(
+          180deg,
+          var(--brand) 0%,
+          var(--brand-strong) 100%
+        );
         color: #fff;
         font-weight: 700;
+        box-shadow: 0 8px 16px rgba(16, 131, 63, 0.18);
       }
 
       .step-text {
         margin: 0;
         padding-top: 4px;
+        color: var(--ink);
       }
 
       .empty {
         margin: 0;
         color: var(--muted);
+      }
+
+      @media (max-width: 560px) {
+        .ingredient-list {
+          grid-template-columns: 1fr;
+        }
+
+        .ingredient-card.with-image {
+          grid-template-columns: minmax(0, 1fr) 72px;
+        }
+
+        .ingredient-media {
+          width: 72px;
+          height: 72px;
+        }
       }
     </style>
   </head>
@@ -202,12 +305,12 @@
               <p class="stat-value" id="servings">-</p>
             </div>
             <div class="stat">
-              <p class="stat-label">Compra total</p>
-              <p class="stat-value" id="purchase-cost">-</p>
+              <p class="stat-label">Coste total</p>
+              <p class="stat-value" id="total-cost">-</p>
             </div>
             <div class="stat">
-              <p class="stat-label">Coste consumido</p>
-              <p class="stat-value" id="consumed-cost">-</p>
+              <p class="stat-label">Calorías receta</p>
+              <p class="stat-value" id="total-calories">-</p>
             </div>
           </div>
         </header>
@@ -230,10 +333,14 @@
       const questionEl = document.getElementById("question");
       const productCountEl = document.getElementById("product-count");
       const servingsEl = document.getElementById("servings");
-      const purchaseCostEl = document.getElementById("purchase-cost");
-      const consumedCostEl = document.getElementById("consumed-cost");
+      const totalCostEl = document.getElementById("total-cost");
+      const totalCaloriesEl = document.getElementById("total-calories");
       const ingredientsEl = document.getElementById("ingredients");
       const stepsEl = document.getElementById("steps");
+      let hydrationTimer = null;
+      let hydrationAttempts = 0;
+      const MAX_HYDRATION_ATTEMPTS = 24;
+      const HYDRATION_INTERVAL_MS = 250;
 
       function escapeHtml(value) {
         return String(value ?? "")
@@ -261,33 +368,50 @@
         ).format(Number(value));
       }
 
+      function formatCount(value) {
+        if (
+          value === null ||
+          value === undefined ||
+          Number.isNaN(Number(value))
+        ) {
+          return null;
+        }
+        const number = Number(value);
+        return Number.isInteger(number)
+          ? String(number)
+          : number.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+      }
+
+      function formatCalories(value) {
+        if (
+          value === null ||
+          value === undefined ||
+          Number.isNaN(Number(value))
+        ) {
+          return "N/D";
+        }
+        return (
+          new Intl.NumberFormat(
+            document.documentElement.lang || "es-ES"
+          ).format(Math.round(Number(value))) + " kcal"
+        );
+      }
+
       function buildIngredientMeta(item) {
         const parts = [];
-        if (
-          item.cantidad_receta_valor !== null &&
-          item.cantidad_receta_valor !== undefined
-        ) {
-          const amount = Number(item.cantidad_receta_valor);
-          const amountText = Number.isInteger(amount)
-            ? String(amount)
-            : amount.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
-          if (item.cantidad_receta_unidad) {
-            parts.push(amountText + " " + item.cantidad_receta_unidad);
-          } else {
-            parts.push(amountText);
-          }
-        }
-        if (
-          item.precio_envase_eur !== null &&
-          item.precio_envase_eur !== undefined
-        ) {
-          parts.push("envase " + formatMoney(item.precio_envase_eur));
+        const unitsText = formatCount(
+          item.envases_a_comprar ??
+            item.cantidad_receta_valor ??
+            null
+        );
+        if (unitsText) {
+          parts.push(unitsText + " ud");
         }
         if (
           item.coste_compra_eur !== null &&
           item.coste_compra_eur !== undefined
         ) {
-          parts.push("compra " + formatMoney(item.coste_compra_eur));
+          parts.push("Total " + formatMoney(item.coste_compra_eur));
         }
         return parts.join(" · ");
       }
@@ -299,12 +423,48 @@
         }
         return cleanText
           .split(/(?<=[.!?])\s+/)
-          .map((part) => part.trim())
+          .map((part) =>
+            part
+              .trim()
+              .replace(
+                /^(?:paso\s*)?\d+\s*(?:[).:\-]|[-–—])\s*/i,
+                ""
+              )
+              .trim()
+          )
           .filter(Boolean);
       }
 
       function getToolData() {
         return window.openai?.toolOutput || {};
+      }
+
+      function normalizePayload(result) {
+        if (!result || typeof result !== "object") {
+          return {};
+        }
+        if (
+          result.structuredContent &&
+          typeof result.structuredContent === "object"
+        ) {
+          return result.structuredContent;
+        }
+        return result;
+      }
+
+      function hasRenderableRecipeData(payload) {
+        if (!payload || typeof payload !== "object") {
+          return false;
+        }
+        if (
+          Array.isArray(payload.ingredientes_mercadona) &&
+          payload.ingredientes_mercadona.length > 0
+        ) {
+          return true;
+        }
+        return Boolean(
+          String(payload.receta_y_pasos_texto_literal ?? "").trim()
+        );
       }
 
       function formatQuestionTitle(value) {
@@ -324,10 +484,19 @@
 
         ingredientsEl.innerHTML = items
           .map((item) => {
+            const imageUrl = String(item.imagen_url || "").trim();
+            const hasImage = Boolean(imageUrl);
             return `
-              <article class="ingredient-card">
-                <p class="ingredient-name">${escapeHtml(item.producto_mercadona || "Producto sin nombre")}</p>
-                <p class="ingredient-meta">${escapeHtml(buildIngredientMeta(item) || "Sin detalle de coste")}</p>
+              <article class="ingredient-card${hasImage ? " with-image" : ""}">
+                <div class="ingredient-copy">
+                  <p class="ingredient-name">${escapeHtml(item.producto_mercadona || "Producto sin nombre")}</p>
+                  <p class="ingredient-meta">${escapeHtml(buildIngredientMeta(item) || "Sin detalle de coste")}</p>
+                </div>
+                ${
+                  hasImage
+                    ? `<div class="ingredient-media" aria-hidden="true"><img class="ingredient-image" src="${escapeHtml(imageUrl)}" alt="" loading="lazy" /></div>`
+                    : ""
+                }
               </article>
             `;
           })
@@ -355,7 +524,7 @@
       }
 
       function render(data) {
-        const payload = data && typeof data === "object" ? data : {};
+        const payload = normalizePayload(data);
         const ingredients = Array.isArray(payload.ingredientes_mercadona)
           ? payload.ingredientes_mercadona
           : [];
@@ -367,11 +536,11 @@
             : ingredients.length
         );
         servingsEl.textContent = payload.personas || "-";
-        purchaseCostEl.textContent = formatMoney(
+        totalCostEl.textContent = formatMoney(
           payload.coste_total_compra_eur
         );
-        consumedCostEl.textContent = formatMoney(
-          payload.coste_total_consumido_eur
+        totalCaloriesEl.textContent = formatCalories(
+          payload.calorias_totales_kcal
         );
 
         renderIngredients(ingredients);
@@ -379,11 +548,43 @@
       }
 
       function handleToolResult(result) {
-        if (result && typeof result === "object") {
-          render(result.structuredContent || result);
+        render(normalizePayload(result));
+      }
+
+      function stopHydrationRetries() {
+        if (hydrationTimer) {
+          window.clearTimeout(hydrationTimer);
+          hydrationTimer = null;
+        }
+      }
+
+      function scheduleHydrationRetry() {
+        stopHydrationRetries();
+        hydrationTimer = window.setTimeout(() => {
+          hydrationAttempts += 1;
+          const payload = normalizePayload(getToolData());
+          if (
+            hasRenderableRecipeData(payload) ||
+            hydrationAttempts >= MAX_HYDRATION_ATTEMPTS
+          ) {
+            render(payload);
+            stopHydrationRetries();
+            return;
+          }
+          render(payload);
+          scheduleHydrationRetry();
+        }, HYDRATION_INTERVAL_MS);
+      }
+
+      function hydrateFromHost() {
+        const payload = normalizePayload(getToolData());
+        render(payload);
+        hydrationAttempts = 0;
+        if (!hasRenderableRecipeData(payload)) {
+          scheduleHydrationRetry();
           return;
         }
-        render(getToolData());
+        stopHydrationRetries();
       }
 
       window.addEventListener(
@@ -399,6 +600,7 @@
           if (message.method !== "ui/notifications/tool-result") {
             return;
           }
+          stopHydrationRetries();
           handleToolResult(message.params);
         },
         { passive: true }
@@ -407,6 +609,7 @@
       window.addEventListener(
         "openai:set_globals",
         (event) => {
+          stopHydrationRetries();
           handleToolResult(
             event.detail?.globals?.toolOutput || getToolData()
           );
@@ -414,7 +617,19 @@
         { passive: true }
       );
 
-      render(getToolData());
+      window.addEventListener("focus", hydrateFromHost, {
+        passive: true,
+      });
+      window.addEventListener("pageshow", hydrateFromHost, {
+        passive: true,
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          hydrateFromHost();
+        }
+      });
+
+      hydrateFromHost();
     </script>
   </body>
 </html>

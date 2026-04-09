@@ -49,6 +49,7 @@ Globals:
         RECETONA_REQUIRE_PREBUILT_RAG_CACHE: "true"
         RECETONA_EMBED_MODEL: text-embedding-3-large
         RECETONA_CHAT_MODEL: gpt-5.4-nano
+        RECETONA_REASONING_EFFORT: none
         RECETONA_RAG_CACHE_DIR: /tmp/recetona_rag_cache
         RECETONA_RAG_CACHE_S3_BUCKET: !Ref ExistingRagCacheBucketName
         RECETONA_RAG_CACHE_S3_PREFIX: !Ref ExistingRagCachePrefix
