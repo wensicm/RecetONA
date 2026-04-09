@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            mcp/requirements.txt
+            chatgpt-app/server/requirements.txt
+
+      - name: Create virtualenv
+        run: uv venv .venv --python 3.12
+
+      - name: Install dependencies
+        run: |
+          uv pip install --python .venv/bin/python \
+            -r mcp/requirements.txt \
+            -r chatgpt-app/server/requirements.txt \
+            black \
+            pytest
+
+      - name: Check formatting
+        run: |
+          .venv/bin/black -l 79 --check \
+            mcp/src mcp/*.py mcp/tests \
+            chatgpt-app/server/src chatgpt-app/server/*.py chatgpt-app/server/tests
+
+      - name: Run tests
+        run: |
+          .venv/bin/pytest mcp/tests
+          .venv/bin/pytest chatgpt-app/server/tests

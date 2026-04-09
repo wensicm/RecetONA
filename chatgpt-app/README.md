@@ -1,57 +1,54 @@
 # RecetONA ChatGPT App
 
-Esta carpeta es el scaffold separado para evolucionar RecetONA hacia una
-ChatGPT App con estructura tipo Apps SDK:
+`chatgpt-app/` contiene la versión de RecetONA pensada para integrarse con
+ChatGPT Apps.
 
-- `server/`: servidor MCP reutilizando una copia del runtime RAG y del paquete
-  `recetona` que hoy vive en `mcp/`.
-- `web/public/`: widget HTML desacoplado del servidor, pensado para renderizar
-  dentro de ChatGPT.
+## Qué hay aquí
 
-## Qué se ha reutilizado desde `mcp/`
-
-Se han copiado estos elementos para aislar el trabajo de la app respecto al
-backend MCP ya operativo:
-
-- `server/src/recetona/`
-- `server/local_rag_server.py`
-- `server/mercadona_data.xlsx`
-- `server/mercadona_rag_notebook.ipynb`
-- `server/requirements.txt`
+- `server/`: runtime MCP y tools de la app
+- `web/public/`: widget HTML desacoplado
+- `lambda/recetona_chatgpt_app_api/`: snapshot autocontenido para despliegue
+  SAM
 
 ## Arquitectura
 
-El server de esta carpeta ya sigue el patron recomendado de Apps SDK para
-apps con widget:
+La app sigue un patrón desacoplado:
 
-- `query_recipe_data`: tool de datos
-- `render_recipe_widget`: tool de render
-- `search` y `fetch`: tools de catalogo
+- `query_recipe_data`: tool que resuelve datos de receta
+- widget HTML: render del resultado estructurado
+- `search` y `fetch`: tools de catálogo
 
-El widget desacoplado se sirve desde `web/public/recetona-widget.html` y la
-Lambda autocontenida vive en:
+La lógica principal vive en:
 
-- `lambda/recetona_chatgpt_app_api/`
+- `server/src/recetona/`
+- `server/local_rag_server.py`
+- `web/public/recetona-widget.html`
 
 ## Arranque local
 
+Desde la raíz del repo:
+
 ```bash
-cd /Users/wensicm/Repositorios/RecetONA/chatgpt-app/server
-source ../../.venv/bin/activate
-python -m pip install -r requirements.txt
-python recetona_chatgpt_app_server.py --transport streamable-http
+uv venv .venv --python 3.12
+uv pip install --python .venv/bin/python -r chatgpt-app/server/requirements.txt
+cp chatgpt-app/server/.env.example chatgpt-app/server/.env
 ```
 
-El widget externo que usa esta copia está en:
+Luego:
 
-- [recetona-widget.html](/Users/wensicm/Repositorios/RecetONA/chatgpt-app/web/public/recetona-widget.html)
+```bash
+cd chatgpt-app/server
+../../.venv/bin/python recetona_chatgpt_app_server.py --transport streamable-http
+```
 
-## Estado
+## Endpoint desplegado
 
-Esto no sustituye al backend de `mcp/`, que sigue vivo en su endpoint propio.
-La `chatgpt-app` queda desplegada aparte en:
+La app está desplegada en:
 
 - [https://api.wensicm.com/recetona/app](https://api.wensicm.com/recetona/app)
 
-Se mantiene la separación para que el MCP base y la app de ChatGPT puedan
-evolucionar por caminos distintos sin romperse entre si.
+## Nota sobre `lambda/`
+
+La carpeta `lambda/recetona_chatgpt_app_api/` es un snapshot autocontenido
+para `sam build --use-container`. La fuente de verdad para desarrollo sigue
+estando en `server/` y `web/public/`.
