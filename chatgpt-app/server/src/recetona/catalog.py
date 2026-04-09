@@ -11,7 +11,6 @@ from .config import Settings
 from .models import CATALOG_COLUMNS
 from .utils import clean_text, normalize_product_id, safe_float
 
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -157,13 +156,24 @@ def bootstrap_catalog_from_legacy(settings: Settings) -> Path:
         return settings.catalog_csv_path
 
     if settings.legacy_excel_path.exists():
-        LOGGER.info("catalog_bootstrap source=excel path=%s", settings.legacy_excel_path)
-        save_catalog_df(_load_legacy_excel(settings.legacy_excel_path), settings.catalog_csv_path)
+        LOGGER.info(
+            "catalog_bootstrap source=excel path=%s",
+            settings.legacy_excel_path,
+        )
+        save_catalog_df(
+            _load_legacy_excel(settings.legacy_excel_path),
+            settings.catalog_csv_path,
+        )
         return settings.catalog_csv_path
 
     if settings.chunks_csv_path.exists():
-        LOGGER.info("catalog_bootstrap source=chunks path=%s", settings.chunks_csv_path)
-        save_catalog_df(_load_legacy_chunks(settings.chunks_csv_path), settings.catalog_csv_path)
+        LOGGER.info(
+            "catalog_bootstrap source=chunks path=%s", settings.chunks_csv_path
+        )
+        save_catalog_df(
+            _load_legacy_chunks(settings.chunks_csv_path),
+            settings.catalog_csv_path,
+        )
         return settings.catalog_csv_path
 
     raise FileNotFoundError(
@@ -172,7 +182,9 @@ def bootstrap_catalog_from_legacy(settings: Settings) -> Path:
     )
 
 
-def load_catalog_df(settings: Settings, allow_bootstrap: bool = True) -> pd.DataFrame:
+def load_catalog_df(
+    settings: Settings, allow_bootstrap: bool = True
+) -> pd.DataFrame:
     path = settings.catalog_csv_path
     if not path.exists():
         if not allow_bootstrap:
@@ -182,7 +194,9 @@ def load_catalog_df(settings: Settings, allow_bootstrap: bool = True) -> pd.Data
     return ensure_catalog_schema(catalog)
 
 
-def export_catalog_to_excel(catalog_df: pd.DataFrame, output_path: Path) -> Path:
+def export_catalog_to_excel(
+    catalog_df: pd.DataFrame, output_path: Path
+) -> Path:
     catalog = ensure_catalog_schema(catalog_df)
     export_df = catalog.rename(
         columns={
@@ -196,7 +210,10 @@ def export_catalog_to_excel(catalog_df: pd.DataFrame, output_path: Path) -> Path
 
 
 def row_to_fetch_payload(row: pd.Series) -> dict[str, Any]:
-    product_id = normalize_product_id(row.get("product_id")) or str(row.get("row_idx", "")).strip()
+    product_id = (
+        normalize_product_id(row.get("product_id"))
+        or str(row.get("row_idx", "")).strip()
+    )
     title = clean_text(row.get("product_name")) or f"Producto {product_id}"
     text = (
         f"Producto: {title}\n"

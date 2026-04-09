@@ -86,7 +86,11 @@ def split_photo_urls(raw_value: Any) -> list[str]:
     text = str(raw_value).strip()
     if not text:
         return []
-    return [url.strip() for url in re.split(r"\s*\|\s*|\s*\n+\s*", text) if url.strip()]
+    return [
+        url.strip()
+        for url in re.split(r"\s*\|\s*|\s*\n+\s*", text)
+        if url.strip()
+    ]
 
 
 def image_size_score(url: str | None) -> int:
@@ -103,7 +107,9 @@ def image_size_score(url: str | None) -> int:
     return 0
 
 
-def extract_image_urls(product_data: dict[str, Any]) -> tuple[str | None, str | None]:
+def extract_image_urls(
+    product_data: dict[str, Any],
+) -> tuple[str | None, str | None]:
     original_thumbnail_url = product_data.get("thumbnail")
     photos = product_data.get("photos", []) or []
     photo_urls_list: list[str] = []
@@ -111,7 +117,10 @@ def extract_image_urls(product_data: dict[str, Any]) -> tuple[str | None, str | 
 
     for photo in photos:
         if isinstance(photo, dict):
-            candidates = [photo.get(key) for key in ("thumbnail", "regular", "zoom", "url")]
+            candidates = [
+                photo.get(key)
+                for key in ("thumbnail", "regular", "zoom", "url")
+            ]
             best_url = None
             best_score = -1
             for candidate in candidates:
@@ -127,7 +136,9 @@ def extract_image_urls(product_data: dict[str, Any]) -> tuple[str | None, str | 
             photo_urls_list.append(photo)
 
     photo_urls = " | ".join(photo_urls_list) if photo_urls_list else None
-    thumbnail_url = photo_urls_list[0] if photo_urls_list else original_thumbnail_url
+    thumbnail_url = (
+        photo_urls_list[0] if photo_urls_list else original_thumbnail_url
+    )
     return thumbnail_url, photo_urls
 
 

@@ -13,7 +13,6 @@ from .llm import OpenAIBackend
 from .models import CHUNK_COLUMNS
 from .utils import clean_text, numeric_text
 
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -90,7 +89,10 @@ def build_chunks_df(catalog_df: pd.DataFrame) -> pd.DataFrame:
         + " "
         + chunks["allergens"].fillna("").astype(str)
         + " "
-        + chunks["nutrition_ocr_text"].fillna("").astype(str).str.slice(0, 2500)
+        + chunks["nutrition_ocr_text"]
+        .fillna("")
+        .astype(str)
+        .str.slice(0, 2500)
     )
     return chunks[CHUNK_COLUMNS]
 
@@ -106,22 +108,33 @@ def save_chunks_df(chunks_df: pd.DataFrame, path: Path) -> Path:
     return path
 
 
-def load_chunks_df(settings: Settings, allow_build: bool = True) -> pd.DataFrame:
+def load_chunks_df(
+    settings: Settings, allow_build: bool = True
+) -> pd.DataFrame:
     if settings.chunks_csv_path.exists():
         return pd.read_csv(settings.chunks_csv_path)
     if not allow_build:
-        raise FileNotFoundError(f"No existe el indice de chunks en {settings.chunks_csv_path}.")
+        raise FileNotFoundError(
+            f"No existe el indice de chunks en {settings.chunks_csv_path}."
+        )
     catalog_df = load_catalog_df(settings)
     chunks_df = build_chunks_df(catalog_df)
     save_chunks_df(chunks_df, settings.chunks_csv_path)
     return chunks_df
 
 
-def load_embeddings(settings: Settings, chunks_df: pd.DataFrame) -> np.ndarray | None:
-    if not settings.embeddings_path.exists() or not settings.embeddings_hash_path.exists():
+def load_embeddings(
+    settings: Settings, chunks_df: pd.DataFrame
+) -> np.ndarray | None:
+    if (
+        not settings.embeddings_path.exists()
+        or not settings.embeddings_hash_path.exists()
+    ):
         return None
     expected_hash = compute_chunks_hash(chunks_df)
-    stored_hash = settings.embeddings_hash_path.read_text(encoding="utf-8").strip()
+    stored_hash = settings.embeddings_hash_path.read_text(
+        encoding="utf-8"
+    ).strip()
     if stored_hash != expected_hash:
         LOGGER.info("embedding_cache_invalid reason=hash_mismatch")
         return None
@@ -143,17 +156,27 @@ def ensure_embeddings(
         if cached is not None:
             return cached
 
-    embeddings = backend.embed_texts(chunks_df["text"].tolist(), model=settings.embed_model)
+    embeddings = backend.embed_texts(
+        chunks_df["text"].tolist(), model=settings.embed_model
+    )
     settings.embeddings_path.parent.mkdir(parents=True, exist_ok=True)
     np.save(settings.embeddings_path, embeddings)
-    settings.embeddings_hash_path.write_text(compute_chunks_hash(chunks_df), encoding="utf-8")
+    settings.embeddings_hash_path.write_text(
+        compute_chunks_hash(chunks_df), encoding="utf-8"
+    )
     return embeddings
 
 
-def rebuild_index(settings: Settings, backend: OpenAIBackend | None = None, force_embeddings: bool = False) -> pd.DataFrame:
+def rebuild_index(
+    settings: Settings,
+    backend: OpenAIBackend | None = None,
+    force_embeddings: bool = False,
+) -> pd.DataFrame:
     catalog_df = load_catalog_df(settings)
     chunks_df = build_chunks_df(catalog_df)
     save_chunks_df(chunks_df, settings.chunks_csv_path)
     if backend and backend.enabled:
-        ensure_embeddings(settings, backend, chunks_df, force_rebuild=force_embeddings)
+        ensure_embeddings(
+            settings, backend, chunks_df, force_rebuild=force_embeddings
+        )
     return chunks_df
